@@ -1,0 +1,103 @@
+name: Build and publish APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      # 每次使用相同密钥，保证自动构建之间及与现有本地 APK 的签名一致。
+      - name: Restore signing key
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$DEBUG_KEYSTORE_BASE64" ]; then
+            echo '::error::请先配置 ANDROID_DEBUG_KEYSTORE_BASE64 仓库 Secret，见 docs/releasing.md'
+            exit 1
+          fi
+          mkdir -p "$HOME/.android"
+          printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
+          chmod 600 "$HOME/.android/debug.keystore"
+
+      - name: Install Android SDK components
+        run: sdkmanager 'platforms;android-35' 'build-tools;34.0.0'
+
+      - name: Build and lint
+        run: bash ./gradlew --no-daemon assembleDebug lintDebug
+
+      - name: Package APK and checksum
+        id: package
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import shutil
+
+          apk_dir = pathlib.Path('app/build/outputs/apk/debug')
+          metadata = json.loads((apk_dir / 'output-metadata.json').read_text())
+          outputs = metadata['elements']
+          if len(outputs) != 1:
+              raise RuntimeError('Expected exactly one APK')
+          version = outputs[0]['versionName']
+          commit = os.environ['GITHUB_SHA'][:7]
+          tag = f"build-{os.environ['GITHUB_RUN_NUMBER']}-{commit}"
+          dist = pathlib.Path('dist')
+          dist.mkdir(exist_ok=True)
+          apk = dist / f'LibreTV-Home-{version}-{tag}.apk'
+          shutil.copyfile(apk_dir / outputs[0]['outputFile'], apk)
+          checksum = hashlib.sha256(apk.read_bytes()).hexdigest()
+          (dist / 'SHA256.txt').write_text(f'{checksum}  {apk.name}\n', encoding='ascii')
+          pathlib.Path('release-notes.md').write_text(
+              f'自动构建的个人使用调试版（debug APK）。\n\n'
+              f'应用版本：{version}\n\n源码提交：{os.environ["GITHUB_SHA"]}\n\n'
+              f'构建记录：{os.environ["GITHUB_SERVER_URL"]}/{os.environ["GITHUB_REPOSITORY"]}'
+              f'/actions/runs/{os.environ["GITHUB_RUN_ID"]}\n\n'
+              'assembleDebug 和 lintDebug 已通过；本次未自动验证实体电视。'
+              '请下载 APK 安装，SHA256.txt 用于校验。\n', encoding='utf-8')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'tag={tag}\nversion={version}\n')
+          PY
+
+      # 固定绑定本次提交；重复运行已发布的构建时不改写附件。
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.package.outputs.tag }}
+          APP_VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists; skipping publication."
+            exit 0
+          fi
+          gh release create "$RELEASE_TAG" dist/*.apk dist/SHA256.txt \
+            --target "$GITHUB_SHA" \
+            --title "LibreTV Home $APP_VERSION ($RELEASE_TAG)" \
+            --notes-file release-notes.md \
+            --prerelease --latest=false
+
+      - name: Remove signing key
+        if: always()
+        run: rm -f "$HOME/.android/debug.keystore"

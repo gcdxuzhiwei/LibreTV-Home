@@ -1,0 +1,24 @@
+<resources>
+    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#DCF763</item>
+        <item name="android:windowBackground">#0E0F13</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:alertDialogTheme">@style/TVDialogTheme</item>
+    </style>
+    <style name="TVDialogTheme" parent="android:style/Theme.Material.Dialog.Alert">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#DCF763</item>
+        <item name="android:textColorPrimary">#F5F4EF</item>
+        <item name="android:textColorSecondary">#9D9EA9</item>
+        <item name="android:colorBackground">#202127</item>
+        <item name="android:windowBackground">@drawable/dialog_surface</item>
+        <item name="android:windowAnimationStyle">@style/DialogMotion</item>
+    </style>
+    <style name="DialogMotion">
+        <item name="android:windowEnterAnimation">@anim/dialog_enter</item>
+        <item name="android:windowExitAnimation">@anim/dialog_exit</item>
+    </style>
+</resources>
