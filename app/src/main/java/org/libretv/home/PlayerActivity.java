@@ -35,6 +35,7 @@ public final class PlayerActivity extends Activity {
     private TextView title, message;
     private LinearLayout toolbar;
     private Button previous, next;
+    private View toolbarFocus;
     private int line, episode;
     private int shortcutKey=KeyEvent.KEYCODE_UNKNOWN;
     private long position;
@@ -78,6 +79,8 @@ public final class PlayerActivity extends Activity {
     private void layout() {
         FrameLayout root=new FrameLayout(this); root.setBackgroundColor(Color.BLACK);
         view=new PlayerView(this); view.setUseController(true); view.setControllerShowTimeoutMs(4500); view.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING);
+        view.setShowPreviousButton(false); view.setShowNextButton(false);
+        view.findViewById(androidx.media3.ui.R.id.exo_settings).setVisibility(View.GONE);
         root.addView(view,new FrameLayout.LayoutParams(-1,-1));
         toolbar=new LinearLayout(this); toolbar.setClipChildren(false); toolbar.setGravity(Gravity.CENTER_VERTICAL); toolbar.setPadding(dp(24),dp(12),dp(24),dp(12)); toolbar.setBackgroundColor(0xE00E0F13);
         title=new TextView(this); title.setTextColor(TvStyle.TEXT); title.setTextSize(17); title.setMaxLines(2); toolbar.addView(title,new LinearLayout.LayoutParams(0,-2,1));
@@ -92,6 +95,7 @@ public final class PlayerActivity extends Activity {
     private void startPlayer() {
         DefaultHttpDataSource.Factory http=new DefaultHttpDataSource.Factory().setUserAgent(Catalog.UA).setConnectTimeoutMs(10000).setReadTimeoutMs(20000).setAllowCrossProtocolRedirects(true);
         player=new ExoPlayer.Builder(this).setRenderersFactory(new DefaultRenderersFactory(this).setEnableDecoderFallback(true))
+            .setSeekBackIncrementMs(15000).setSeekForwardIncrementMs(15000)
             .setMediaSourceFactory(new DefaultMediaSourceFactory(http)).build();
         view.setPlayer(player);
         player.addListener(new Player.Listener() {
@@ -114,10 +118,10 @@ public final class PlayerActivity extends Activity {
     private void prepare() {
         Catalog.Episode ep=lines.get(line).episodes.get(episode); message.setVisibility(View.GONE);
         player.setMediaItem(MediaItem.fromUri(ep.url)); player.seekTo(position); player.prepare(); player.setPlayWhenReady(playWhenReady);
-        updateTitle(); view.showController(); view.requestFocus();
+        updateTitle(); view.setControllerShowTimeoutMs(4500); view.showController(); view.requestFocus();
     }
     private void updateTitle() {
-        title.setText(video.title()+"  ·  "+lines.get(line).episodes.get(episode).name+"\n"+video.source.name+" / "+lines.get(line).name+"  ·  菜单键选集，左右快进退，确定暂停");
+        title.setText(video.title()+"  ·  "+lines.get(line).episodes.get(episode).name+"\n"+video.source.name+" / "+lines.get(line).name+"  ·  左右跳转15秒，上下切换焦点，确定暂停");
         previous.setEnabled(episode>0); next.setEnabled(episode+1<lines.get(line).episodes.size());
     }
     private void switchEpisode(int index) {
@@ -168,15 +172,36 @@ public final class PlayerActivity extends Activity {
             if(event.getAction()==KeyEvent.ACTION_UP) shortcutKey=KeyEvent.KEYCODE_UNKNOWN;
             return true;
         }
-        if(player!=null && event.getAction()==KeyEvent.ACTION_DOWN && event.getRepeatCount()==0 && !view.isControllerFullyVisible()) {
-            if(keyCode==KeyEvent.KEYCODE_DPAD_LEFT || keyCode==KeyEvent.KEYCODE_DPAD_RIGHT) {
+        if(player!=null && event.getAction()==KeyEvent.ACTION_DOWN && event.getRepeatCount()==0) {
+            boolean inToolbar=toolbar.hasFocus() && toolbar.getVisibility()==View.VISIBLE;
+            // 播放区域的方向快捷键不依赖控制条是否显示，顶部仍保留横向按钮导航。
+            if(keyCode==KeyEvent.KEYCODE_DPAD_UP || keyCode==KeyEvent.KEYCODE_DPAD_DOWN) {
                 shortcutKey=keyCode;
-                long target=Math.max(0,player.getCurrentPosition()+(keyCode==KeyEvent.KEYCODE_DPAD_LEFT?-10000:10000));
-                if(player.getDuration()>0) target=Math.min(target,player.getDuration()); player.seekTo(target); view.showController(); return true;
+                if(keyCode==KeyEvent.KEYCODE_DPAD_UP) {
+                    view.setControllerShowTimeoutMs(0); view.showController();
+                    if(!inToolbar) {
+                        if(toolbarFocus==null || !toolbarFocus.isEnabled()) toolbarFocus=toolbar.getChildAt(1);
+                        toolbarFocus.requestFocus();
+                    }
+                } else {
+                    if(inToolbar) toolbarFocus=getCurrentFocus();
+                    view.setControllerShowTimeoutMs(4500); view.showController();
+                    view.findViewById(androidx.media3.ui.R.id.exo_play_pause).requestFocus();
+                }
+                return true;
             }
-            if(keyCode==KeyEvent.KEYCODE_DPAD_CENTER || keyCode==KeyEvent.KEYCODE_ENTER) { shortcutKey=keyCode; if(player.isPlaying()) player.pause(); else player.play(); view.showController(); return true; }
+            if(!inToolbar && (keyCode==KeyEvent.KEYCODE_DPAD_LEFT || keyCode==KeyEvent.KEYCODE_DPAD_RIGHT)) {
+                shortcutKey=keyCode;
+                if(keyCode==KeyEvent.KEYCODE_DPAD_LEFT) player.seekBack(); else player.seekForward();
+                view.showController(); return true;
+            }
+            if(!inToolbar && (keyCode==KeyEvent.KEYCODE_DPAD_CENTER || keyCode==KeyEvent.KEYCODE_ENTER)) { shortcutKey=keyCode; if(player.getPlayWhenReady()) player.pause(); else player.play(); view.showController(); return true; }
         }
         return super.dispatchKeyEvent(event);
     }
-    @Override public void onBackPressed() { if(view!=null && view.isControllerFullyVisible()) view.hideController(); else finish(); }
+    @Override public void onBackPressed() {
+        if(view!=null && view.isControllerFullyVisible()) {
+            view.setControllerShowTimeoutMs(4500); view.hideController(); view.requestFocus();
+        } else finish();
+    }
 }
