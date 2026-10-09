@@ -10,11 +10,11 @@
 
 当前脚本生成 **debug APK**，不是正式 release 签名包。若分发该包，请在发布说明中标明调试版。长期公开发行应先配置自己的 release 签名，并安全备份密钥；覆盖安装要求签名一致。密钥和密码不放入仓库，其他电脑或 CI 的默认 debug 密钥也不保证与已有安装包一致。
 
-## 自动发布（每次推送到 main）
+## 自动发布（推送到 main 且版本变化）
 
-`.github/workflows/release.yml` 在推送到 `main` 后执行构建与 Lint，成功后创建一个 GitHub **预发布版本**并上传 APK 和 SHA256 文件，也可在 Actions 页面手动运行。仅本地 `git commit` 不触发；一次 push 包含多个提交时，只构建该次推送的最后一个提交。其他分支不自动发布。
+`.github/workflows/release.yml` 在推送到 `main` 后，先比较整次推送前后的 `app/build.gradle`：只有 `versionCode` 或 `versionName` 变化，才执行构建与 Lint，成功后创建一个 GitHub **预发布版本**并上传 APK 和 SHA256 文件。版本未变化时，仅运行版本检查，跳过 APK 构建和发布；改动 App 代码但未更新版本也会跳过。首次推送允许构建，也可在 Actions 页面手动运行，手动运行不受版本变化限制。仅本地 `git commit` 不触发；一次 push 包含多个提交时，比较推送前后的版本，只构建该次推送的最后一个提交。其他分支不自动发布。
 
-版本 tag 采用 `build-<运行编号>-<提交短哈希>`，例如 `build-12-a1b2c3d`，绑定实际构建的完整提交。每次推送保留独立下载记录，不覆盖正式 `v1.1.3` 之类的版本，也不设置为正式 Latest；下载请打开 Releases 列表。重新运行同一个工作流时，若该构建已发布，则保留原有附件。
+版本 tag 采用 `build-<运行编号>-<提交短哈希>`，例如 `build-12-a1b2c3d`，绑定实际构建的完整提交。每次构建发布保留独立下载记录，不覆盖正式 `v1.1.3` 之类的版本，也不设置为正式 Latest；下载请打开 Releases 列表。重新运行同一个工作流时，若该构建已发布，则保留原有附件。
 
 ### 首次配置签名 Secret
 
@@ -28,7 +28,7 @@
    ```
 
 2. 在 GitHub 仓库 **Settings → Secrets and variables → Actions → New repository secret** 中，新建 `ANDROID_DEBUG_KEYSTORE_BASE64`，粘贴剪贴板内容并保存。随后清空剪贴板。
-3. 将完整项目（含 `.github/workflows/release.yml`）提交并推送到 `main`，到 **Actions → Build and publish APK** 查看执行结果。GitHub 自动提供的 `GITHUB_TOKEN` 用于发布，无需另建个人访问令牌；仓库或组织策略须允许 Actions 写入仓库内容。
+3. 将完整项目（含 `.github/workflows/release.yml`）提交并推送到 `main`，到 **Actions → Build and publish APK** 查看执行结果。如果版本未变化，可使用 **Run workflow** 手动构建。GitHub 自动提供的 `GITHUB_TOKEN` 用于发布，无需另建个人访问令牌；仓库或组织策略须允许 Actions 写入仓库内容。
 
 未配置签名 Secret 时，流程会明确报错并停止，不会生成随机签名的安装包。Base64 是编码，不是加密，内容只粘贴到 Secret，不提交到源码或发布附件。当前流程使用标准 Android debug 密钥配置；正式 release 签名包需要另行配置签名流程。
 

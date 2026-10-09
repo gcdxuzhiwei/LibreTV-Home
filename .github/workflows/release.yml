@@ -9,8 +9,58 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  check-version:
     if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.version.outputs.changed }}
+    steps:
+      - name: Checkout source and history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # 比较整次推送前后的版本；手动运行和首次推送允许构建。
+      - name: Check app version
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import re
+          import subprocess
+
+          def read_version(source):
+              codes = re.findall(r'^\s*versionCode\s+(\d+)\s*$', source, re.MULTILINE)
+              names = re.findall(r'^\s*versionName\s+[\'\"]([^\'\"]+)[\'\"]\s*$', source, re.MULTILINE)
+              if len(codes) != 1 or len(names) != 1:
+                  raise RuntimeError('Expected exactly one versionCode and versionName in app/build.gradle')
+              return int(codes[0]), names[0]
+
+          before = os.environ.get('BEFORE_SHA', '')
+          if os.environ['EVENT_NAME'] == 'workflow_dispatch' or before == '0' * 40:
+              changed = True
+              print('Manual run or initial push; build enabled.')
+          else:
+              previous_source = subprocess.check_output(
+                  ['git', 'show', f'{before}:app/build.gradle'], text=True)
+              previous = read_version(previous_source)
+              current = read_version(pathlib.Path('app/build.gradle').read_text(encoding='utf-8'))
+              changed = previous != current
+              print(f'App version: {previous} -> {current}; build enabled: {changed}')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'changed={str(changed).lower()}\n')
+          PY
+
+  release:
+    needs: check-version
+    if: needs.check-version.outputs.changed == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
