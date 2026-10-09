@@ -47,16 +47,22 @@ public final class MainActivity extends Activity {
     private ScrollView scroll;
     private GridLayout grid;
     private TvStyle.Skeleton skeleton;
-    private Button more, categoryButton, sourceButton, searchButton;
+    private Button more, categoryButton, sourceButton, searchButton, historyButton;
+    private AlertDialog exitDialog;
+    private int focusRecoveryKey=KeyEvent.KEYCODE_UNKNOWN;
     private String keyword = "", category = "", categoryName = "全部分类", screen = "home";
-    private int generation, page = 1, outstanding, failures, success, homeScroll;
+    private int generation, page = 1, outstanding, failures, success;
     private Catalog.Video detail;
     private List<Catalog.Line> lines = Collections.emptyList();
     private int currentLine;
-    private boolean busy, reloadHome;
+    private boolean busy;
 
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::onBackPressed);
+        }
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
         store = new LocalStore(this); sources = store.sources(); selected = firstEnabled();
         if (saved != null) {
@@ -65,7 +71,7 @@ public final class MainActivity extends Activity {
             for (Catalog.Source source : sources) if (source.url.equals(url)) selected = source;
             category = saved.getString("category", ""); categoryName = saved.getString("categoryName", "全部分类");
         }
-        home(); load(true);
+        home();
     }
     @Override protected void onSaveInstanceState(Bundle state) {
         super.onSaveInstanceState(state); state.putString("keyword", keyword); state.putString("category", category);
@@ -95,12 +101,14 @@ public final class MainActivity extends Activity {
         root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{Color.rgb(29,26,40),BG,BG}));
         LinearLayout header = row(); header.setClipChildren(false); TextView logo = text("LibreTV.",27,TvStyle.TEXT); logo.setTypeface(null,Typeface.BOLD);
         header.addView(logo); TextView sub = text("   /   " + subtitle,14,TvStyle.MUTED); header.addView(sub,new LinearLayout.LayoutParams(0,-2,1));
-        header.addView(button("继续观看",this::history)); header.addView(button("影视源",this::settings));
+        historyButton=button("继续观看",this::history);
+        header.addView(historyButton); header.addView(button("影视源",this::settings));
         root.addView(header);
         body = new LinearLayout(this); body.setOrientation(LinearLayout.VERTICAL); body.setPadding(0,dp(16),0,0); body.setClipChildren(false);
         root.addView(body,new LinearLayout.LayoutParams(-1,0,1)); setContentView(root); TvStyle.enter(body,0);
     }
     private void home() {
+        cancel();
         screen = "home"; shell("家庭影院");
         LinearLayout intro=row(); intro.setPadding(0,0,0,dp(16));
         LinearLayout words=new LinearLayout(this); words.setOrientation(LinearLayout.VERTICAL);
@@ -116,28 +124,33 @@ public final class MainActivity extends Activity {
         search.setPadding(dp(16),0,dp(12),0); search.setImeOptions(EditorInfo.IME_ACTION_SEARCH); focusable(search);
         LinearLayout.LayoutParams editLp = new LinearLayout.LayoutParams(0,dp(46),1); editLp.setMargins(0,0,dp(12),0); controls.addView(search,editLp);
         searchButton=button("搜索",this::searchNow); controls.addView(searchButton);
-        controls.addView(button("首页",() -> { keyword=""; category=""; categoryName="全部分类"; home(); load(true); }));
+        controls.addView(button("首页",() -> { keyword=""; category=""; categoryName="全部分类"; home(); }));
         sourceButton = button(selected == null ? "选择来源" : selected.name, this::chooseSource); controls.addView(sourceButton);
         categoryButton = button(categoryName,this::chooseCategory); controls.addView(categoryButton);
         body.addView(controls);
         search.setOnEditorActionListener((v,action,event) -> { if (action == EditorInfo.IME_ACTION_SEARCH || (event != null && event.getKeyCode()==KeyEvent.KEYCODE_ENTER && event.getAction()==KeyEvent.ACTION_UP)) { searchNow(); return true; } return false; });
         status = text("正在加载影视列表…",14,TvStyle.MUTED); status.setPadding(0,dp(14),0,dp(8)); body.addView(status);
-        scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setClipToPadding(false); scroll.setPadding(dp(6),0,dp(6),0); TvStyle.viewport(scroll);
+        scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setClipChildren(false); scroll.setClipToPadding(false); scroll.setPadding(dp(6),0,dp(6),0); TvStyle.viewport(scroll);
         LinearLayout content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL); content.setClipChildren(false);
         grid = new GridLayout(this); grid.setColumnCount(5); grid.setClipChildren(false); grid.setClipToPadding(false); grid.setPadding(0,dp(14),0,dp(6)); content.addView(grid);
         LinearLayout footer = row(); footer.setGravity(Gravity.CENTER); footer.setPadding(0,dp(16),0,dp(8));
         more=button("加载更多",() -> load(false)); footer.addView(more); footer.addView(button("重新加载",() -> load(true))); content.addView(footer);
         scroll.addView(content); body.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        for (Catalog.Video v : videos) card(v);
-        updateMore(); if (!videos.isEmpty()) status.setText(summary());
-        scroll.post(() -> scroll.scrollTo(0,homeScroll));
-        controls.getChildAt(1).requestFocus();
+        more.setEnabled(false);
+        // 所有首页入口统一等窗口挂载后聚焦页头，再重新加载第一页。
+        Button initialFocus=historyButton;
+        initialFocus.post(() -> {
+            if (screen.equals("home") && historyButton==initialFocus && initialFocus.isAttachedToWindow()) {
+                initialFocus.requestFocusFromTouch();
+                load(true);
+            }
+        });
     }
     private void searchNow() {
         String value = search.getText().toString().trim(); if (value.isEmpty()) { toast("请输入影视名称"); search.requestFocus(); return; }
         ((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(search.getWindowToken(),0);
-        searchButton.requestFocus();
-        keyword=value; category=""; categoryName="全部分类"; homeScroll=0; load(true);
+        searchButton.requestFocusFromTouch();
+        keyword=value; category=""; categoryName="全部分类"; load(true);
     }
     private void cancelImages() {
         imageGeneration++;
@@ -149,7 +162,12 @@ public final class MainActivity extends Activity {
     private void cancel() { generation++; for (Future<?> f : pending) f.cancel(true); pending.clear(); cancelImages(); busy=false; }
     private void load(boolean reset) {
         if (!reset && busy) return;
-        if (reset) { cancel(); videos.clear(); seen.clear(); pageCounts.clear(); incompletePageSources.clear(); reloadHome=false; grid.removeAllViews(); skeleton=null; page=1; homeScroll=0; scroll.scrollTo(0,0); }
+        Button resetFocus=historyButton;
+        if (reset) resetFocus.requestFocusFromTouch();
+        // 加载更多按钮禁用前把焦点交给末项，避免方向键兜底跳回页头。
+        View paginationFocus=!reset && !videos.isEmpty() ? grid.getChildAt(grid.getChildCount()-1) : null;
+        if (paginationFocus!=null) paginationFocus.requestFocusFromTouch();
+        if (reset) { cancel(); videos.clear(); seen.clear(); pageCounts.clear(); incompletePageSources.clear(); grid.removeAllViews(); skeleton=null; page=1; scroll.scrollTo(0,0); }
         // 失败或离开页面时取消的来源先补齐当前页，再推进下一页。
         boolean retry = !reset && !incompletePageSources.isEmpty();
         if (!reset && !retry) page++;
@@ -190,6 +208,14 @@ public final class MainActivity extends Activity {
                 if (outstanding==0) {
                     clearSkeleton();
                     busy=false; pending.clear(); updateMore();
+                    // 第一页加载完成后进入首项；用户已主动移动焦点时保留其选择。
+                    if (requestedPage==1 && !videos.isEmpty() && resetFocus.hasFocus()) {
+                        View firstCard=grid.getChildAt(0);
+                        firstCard.post(() -> {
+                            if (token==generation && screen.equals("home") && resetFocus.hasFocus()
+                                && firstCard.isAttachedToWindow()) firstCard.requestFocusFromTouch();
+                        });
+                    }
                     if (videos.isEmpty()) status.setText(failures==0 ? "没有找到影片，请更换关键词或来源。" : "加载失败："+message+"。可重新加载或更换来源。");
                 }
             });
@@ -216,7 +242,7 @@ public final class MainActivity extends Activity {
         TextView title=text(video.title(),16,TvStyle.TEXT); title.setTypeface(null,Typeface.BOLD); title.setSingleLine(); title.setEllipsize(android.text.TextUtils.TruncateAt.END); title.setPadding(0,dp(10),0,0); card.addView(title);
         TextView meta=text(video.raw.optString("vod_remarks")+" · "+video.source.name,12,TvStyle.MUTED); meta.setSingleLine(); meta.setEllipsize(android.text.TextUtils.TruncateAt.END); card.addView(meta);
         card.setContentDescription(video.title()+"，"+video.meta()+"，"+video.source.name);
-        card.setOnClickListener(v -> TvStyle.press(card,() -> { homeScroll=scroll.getScrollY(); openDetail(video); })); grid.addView(card);
+        card.setOnClickListener(v -> TvStyle.press(card,() -> openDetail(video))); grid.addView(card);
         if(grid.getChildCount()<=10) TvStyle.enter(card,((grid.getChildCount()-1)%5)*35);
         String url=video.raw.optString("vod_pic"); if (!Catalog.http(url)) return;
         Bitmap cached=covers.get(url); if (cached!=null) { image.setImageBitmap(cached); return; }
@@ -238,7 +264,7 @@ public final class MainActivity extends Activity {
     }
     private void chooseSource() {
         String[] names=new String[sources.size()]; for (int i=0;i<names.length;i++) names[i]=sources.get(i).name;
-        new AlertDialog.Builder(this).setTitle("选择首页来源").setItems(names,(d,i) -> { selected=sources.get(i); keyword=""; category=""; categoryName="全部分类"; types.clear(); home(); load(true); }).setNegativeButton("取消",null).show();
+        new AlertDialog.Builder(this).setTitle("选择首页来源").setItems(names,(d,i) -> { selected=sources.get(i); keyword=""; category=""; categoryName="全部分类"; types.clear(); home(); }).setNegativeButton("取消",null).show();
     }
     private void chooseCategory() {
         if (selected==null) { settings(); return; }
@@ -255,7 +281,7 @@ public final class MainActivity extends Activity {
     }
     private void openDetail(Catalog.Video video) {
         cancel(); int token=generation; screen="detail"; detail=video; lines=Collections.emptyList(); shell(video.title()); body.addView(text("正在获取影片详情…",22,Color.WHITE));
-        body.addView(button("返回列表",this::returnHome));
+        Button back=button("返回列表",this::returnHome); body.addView(back); back.requestFocusFromTouch();
         pending.add(workers.submit(() -> {
             try { Catalog.Video full=Catalog.detail(video); runOnUiThread(() -> { if (token==generation && screen.equals("detail")) { detail=full; lines=Catalog.lines(full); currentLine=0; JSONObject p=store.progress(full); for(int i=0;i<lines.size();i++) if(lines.get(i).name.equals(p.optString("line"))) currentLine=i; renderDetail(); } }); }
             catch (Exception e) { runOnUiThread(() -> { if (token==generation) { body.addView(text("详情加载失败："+e.getMessage(),18,Color.LTGRAY)); body.addView(button("重试",() -> openDetail(video))); } }); }
@@ -267,7 +293,7 @@ public final class MainActivity extends Activity {
         TextView desc=text(Html.fromHtml(detail.raw.optString("vod_content")).toString().trim(),15,TvStyle.MUTED);
         desc.setMaxLines(3); desc.setPadding(0,dp(12),0,dp(14)); body.addView(desc);
         LinearLayout actions=row(); actions.addView(button("返回列表",this::returnHome));
-        actions.addView(button("搜索其他来源",() -> { keyword=detail.title(); category=""; home(); load(true); }));
+        actions.addView(button("搜索其他来源",() -> { keyword=detail.title(); category=""; home(); }));
         if (!lines.isEmpty()) {
             JSONObject p=store.progress(detail);
             int resume=Math.min(p.optInt("episode",0),lines.get(currentLine).episodes.size()-1);
@@ -278,14 +304,14 @@ public final class MainActivity extends Activity {
             }));
         }
         body.addView(actions);
-        if (lines.isEmpty()) { body.addView(text("该影片暂无可直接播放的媒体线路，可搜索其他来源。",18,Color.LTGRAY)); return; }
+        if (lines.isEmpty()) { body.addView(text("该影片暂无可直接播放的媒体线路，可搜索其他来源。",18,Color.LTGRAY)); actions.getChildAt(0).requestFocusFromTouch(); return; }
         TextView label=text("选集  ·  "+lines.get(currentLine).episodes.size()+" 集",17,TvStyle.TEXT); label.setTypeface(null,Typeface.BOLD); label.setPadding(0,dp(16),0,dp(10)); body.addView(label);
         ScrollView episodes=new ScrollView(this); episodes.setClipToPadding(false); episodes.setPadding(dp(4),dp(4),dp(4),0); TvStyle.viewport(episodes); GridLayout list=new GridLayout(this); list.setColumnCount(6); list.setClipChildren(false);
         for(int i=0;i<lines.get(currentLine).episodes.size();i++) {
             int index=i; Button b=button(lines.get(currentLine).episodes.get(i).name,() -> play(index,false));
             GridLayout.LayoutParams lp=new GridLayout.LayoutParams(); lp.width=(getResources().getDisplayMetrics().widthPixels-dp(80))/6-dp(8); lp.height=dp(44); lp.setMargins(0,0,dp(8),dp(10)); b.setLayoutParams(lp); list.addView(b); if(i<12) TvStyle.enter(b,(i%6)*25);
         }
-        episodes.addView(list); body.addView(episodes,new LinearLayout.LayoutParams(-1,0,1)); actions.getChildAt(2).requestFocus();
+        episodes.addView(list); body.addView(episodes,new LinearLayout.LayoutParams(-1,0,1)); actions.getChildAt(2).requestFocusFromTouch();
     }
     private void play(int episode, boolean resume) {
         try {
@@ -295,16 +321,13 @@ public final class MainActivity extends Activity {
         } catch (Exception e) { toast("无法打开播放器："+e.getMessage()); }
     }
     private void returnHome() {
-        cancel();
         if (selected==null || !sources.contains(selected) || !selected.enabled) {
             Catalog.Source replacement=firstEnabled();
             if (selected!=replacement) {
-                selected=replacement; category=""; categoryName="全部分类"; types.clear(); reloadHome=true;
+                selected=replacement; category=""; categoryName="全部分类"; types.clear();
             }
         }
         home();
-        if (reloadHome || videos.isEmpty()) load(true);
-        else if (!incompletePageSources.isEmpty()) load(false);
     }
     private void history() {
         cancel(); screen="history"; shell("继续观看"); LinearLayout actions=row(); actions.addView(button("返回首页",this::returnHome));
@@ -317,20 +340,20 @@ public final class MainActivity extends Activity {
                 LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(52)); lp.setMargins(0,0,0,dp(10)); list.addView(b,lp);
             } catch(Exception ignored) { }
         }
-        sc.addView(list); body.addView(sc,new LinearLayout.LayoutParams(-1,0,1)); actions.getChildAt(0).requestFocus();
+        sc.addView(list); body.addView(sc,new LinearLayout.LayoutParams(-1,0,1)); actions.getChildAt(0).requestFocusFromTouch();
     }
     private void settings() {
         cancel(); screen="settings"; shell("影视源管理");
         TextView help=text("管理你的影视来源。启用的来源参与搜索，首页可单独选择浏览来源。",15,TvStyle.MUTED); body.addView(help);
         LinearLayout actions=row(); actions.setPadding(0,dp(14),0,dp(14)); actions.addView(button("返回首页",this::returnHome));
-        actions.addView(button("添加来源",this::addSource)); actions.addView(button("关于",() -> new AlertDialog.Builder(this).setTitle("LibreTV 家庭影院 1.1.3").setMessage("基于 LibreSpark/LibreTV 的苹果 CMS 协议，原生 Android TV 实现。\n\n无账号、无启动密码、无自建后端。数据与视频由第三方源直接提供，观看记录仅保存在本机。\n\n上游：https://github.com/LibreSpark/LibreTV\n许可：GNU AGPL-3.0，源码随项目提供。\n播放器：AndroidX Media3（Apache-2.0）。").setPositiveButton("关闭",null).show())); body.addView(actions);
+        actions.addView(button("添加来源",this::addSource)); actions.addView(button("关于",() -> new AlertDialog.Builder(this).setTitle("LibreTV 家庭影院 1.1.4").setMessage("基于 LibreSpark/LibreTV 的苹果 CMS 协议，原生 Android TV 实现。\n\n无账号、无启动密码、无自建后端。数据与视频由第三方源直接提供，观看记录仅保存在本机。\n\n上游：https://github.com/LibreSpark/LibreTV\n许可：GNU AGPL-3.0，源码随项目提供。\n播放器：AndroidX Media3（Apache-2.0）。").setPositiveButton("关闭",null).show())); body.addView(actions);
         ScrollView sc=new ScrollView(this); TvStyle.viewport(sc); LinearLayout list=new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL);
         for(Catalog.Source s : sources) {
-            LinearLayout r=row(); CheckBox toggle=new CheckBox(this); toggle.setText(s.name); toggle.setTextSize(17); toggle.setTextColor(Color.WHITE); toggle.setChecked(s.enabled); toggle.setOnCheckedChangeListener((b,on) -> { s.enabled=on; reloadHome=true; store.saveSources(sources); }); r.addView(toggle,new LinearLayout.LayoutParams(0,dp(52),1));
-            r.addView(button("检测",() -> probe(s))); r.addView(button("删除",() -> new AlertDialog.Builder(this).setTitle("删除“"+s.name+"”？").setPositiveButton("删除",(d,w) -> { sources.remove(s); reloadHome=true; store.saveSources(sources); settings(); }).setNegativeButton("取消",null).show()));
+            LinearLayout r=row(); CheckBox toggle=new CheckBox(this); toggle.setText(s.name); toggle.setTextSize(17); toggle.setTextColor(Color.WHITE); toggle.setChecked(s.enabled); toggle.setOnCheckedChangeListener((b,on) -> { s.enabled=on; store.saveSources(sources); }); r.addView(toggle,new LinearLayout.LayoutParams(0,dp(52),1));
+            r.addView(button("检测",() -> probe(s))); r.addView(button("删除",() -> new AlertDialog.Builder(this).setTitle("删除“"+s.name+"”？").setPositiveButton("删除",(d,w) -> { sources.remove(s); store.saveSources(sources); settings(); }).setNegativeButton("取消",null).show()));
             list.addView(r); TextView url=text(s.url,12,Color.GRAY); url.setPadding(dp(8),0,0,dp(14)); list.addView(url);
         }
-        sc.addView(list); body.addView(sc,new LinearLayout.LayoutParams(-1,0,1)); actions.getChildAt(0).requestFocus();
+        sc.addView(list); body.addView(sc,new LinearLayout.LayoutParams(-1,0,1)); actions.getChildAt(0).requestFocusFromTouch();
     }
     private void probe(Catalog.Source s) {
         toast("正在检测 "+s.name); workers.submit(() -> { String message; try { Catalog.Page p=Catalog.page(s,"","",1); message=s.name+" 可用，返回 "+p.videos.size()+" 部影视"; } catch(Exception e) { message=s.name+"："+e.getMessage(); } String result=message; runOnUiThread(() -> { if(!isDestroyed()) new AlertDialog.Builder(this).setTitle("来源检测").setMessage(result).setPositiveButton("确定",null).show(); }); });
@@ -344,7 +367,7 @@ public final class MainActivity extends Activity {
             String n=name.getText().toString().trim(), u=url.getText().toString().trim();
             if(n.isEmpty() || !Catalog.http(u)) { toast("填写名称和有效的 http(s) 接口地址"); return; }
             for(Catalog.Source s:sources) if(s.url.equals(u)) { toast("该地址已存在"); return; }
-            sources.add(new Catalog.Source(n,u,true)); reloadHome=true; store.saveSources(sources); dialog.dismiss(); settings();
+            sources.add(new Catalog.Source(n,u,true)); store.saveSources(sources); dialog.dismiss(); settings();
         })); dialog.show();
     }
     private void toast(String message) { Toast.makeText(this,message,Toast.LENGTH_LONG).show(); }
@@ -356,7 +379,34 @@ public final class MainActivity extends Activity {
             renderDetail();
         }
     }
-    @Override public void onBackPressed() { if(!screen.equals("home")) returnHome(); else if(!keyword.isEmpty() || !category.isEmpty()) { keyword=""; category=""; categoryName="全部分类"; home(); load(true); } else super.onBackPressed(); }
+    @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        int key=event.getKeyCode();
+        if (key==focusRecoveryKey) {
+            if (event.getAction()==KeyEvent.ACTION_UP) focusRecoveryKey=KeyEvent.KEYCODE_UNKNOWN;
+            return true;
+        }
+        boolean direction=key==KeyEvent.KEYCODE_DPAD_UP || key==KeyEvent.KEYCODE_DPAD_DOWN
+            || key==KeyEvent.KEYCODE_DPAD_LEFT || key==KeyEvent.KEYCODE_DPAD_RIGHT;
+        View focused=getCurrentFocus();
+        // 触摸或列表更新可能让焦点落到容器，第一下方向键只恢复首页入口。
+        if (screen.equals("home") && direction && event.getAction()==KeyEvent.ACTION_DOWN
+            && (focused==null || !focused.isEnabled() || !focused.isClickable())) {
+            if (historyButton.requestFocusFromTouch()) { focusRecoveryKey=key; return true; }
+        }
+        return super.dispatchKeyEvent(event);
+    }
+    @Override public void onBackPressed() {
+        if (!screen.equals("home")) { returnHome(); return; }
+        if (exitDialog!=null) return;
+        exitDialog=new AlertDialog.Builder(this).setTitle("退出软件？")
+            .setMessage("确定退出 LibreTV 家庭影院吗？")
+            .setPositiveButton("确定",(d,w) -> finishAndRemoveTask())
+            .setNegativeButton("取消",null).create();
+        exitDialog.setOnDismissListener(d -> exitDialog=null);
+        exitDialog.show();
+        exitDialog.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocusFromTouch();
+    }
+    @Override protected void onStop() { focusRecoveryKey=KeyEvent.KEYCODE_UNKNOWN; super.onStop(); }
     @Override protected void onDestroy() { cancel(); workers.shutdownNow(); images.shutdownNow(); covers.evictAll(); super.onDestroy(); }
 }
 

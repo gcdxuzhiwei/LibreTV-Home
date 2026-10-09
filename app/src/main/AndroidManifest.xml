@@ -7,7 +7,8 @@
     <application android:label="LibreTV 家庭影院" android:theme="@style/AppTheme"
         android:icon="@drawable/icon" android:banner="@drawable/banner"
         android:usesCleartextTraffic="true" android:allowBackup="false" android:fullBackupContent="false"
-        android:dataExtractionRules="@xml/data_extraction_rules" android:supportsRtl="true">
+        android:dataExtractionRules="@xml/data_extraction_rules" android:supportsRtl="true"
+        android:enableOnBackInvokedCallback="true">
         <activity android:name=".PlayerActivity" android:screenOrientation="landscape" android:exported="false" />
         <activity android:name=".MainActivity" android:screenOrientation="landscape" android:exported="true">
             <intent-filter>
