@@ -119,6 +119,10 @@ Android TV API 30 / x86 / 1280×720，无窗口运行：
 
 截图位于 `docs/screenshots/`。播放画面仅用于本地验证，未将影片片段打包到 APK。
 
+## 固定签名构建（1.1.6）
+
+2026-10-09，`scripts/build.ps1`（`assembleDebug lintDebug`）通过，APK 版本为 1.1.6 / versionCode 8，`apksigner verify --print-certs` 确认签名指纹与 `signing-certificate.sha256` 一致。使用 `LIBRETV_KEYSTORE` 指定正确密钥时校验通过，指定不存在的密钥或临时生成的另一把密钥时均被拒绝；临时验证密钥已删除。GitHub Actions 修改尚未在远端运行，本次未操作 MuMu 或验证设备覆盖安装。
+
 ## 未覆盖
 
 未验证实体小米电视的安装权限、遥控器键值差异、旧系统证书和硬件音视频解码器；未穷举所有影片、线路、特殊请求头、DRM、自动播完下一集、断网恢复或 Android 6.0 实机。没有提供网页解析器或远程代理，返回网页地址的线路不会出现在选集列表。

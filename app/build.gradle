@@ -7,11 +7,45 @@ android {
         applicationId 'org.libretv.home'
         minSdk 23
         targetSdk 35
-        versionCode 7
-        versionName '1.1.5'
+        versionCode 8
+        versionName '1.1.6'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    // 使用明确的密钥路径，避免不同构建环境自动生成 debug 密钥。
+    signingConfigs {
+        stable {
+            storeFile rootProject.file(System.getenv('LIBRETV_KEYSTORE') ?: '.tools/signing/debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+    buildTypes {
+        debug { signingConfig signingConfigs.stable }
+    }
 }
+
+// 固定公开证书指纹；密钥缺失或被替换时直接失败，不发布无法覆盖升级的 APK。
+def verifyStableSigning = tasks.register('verifyStableSigning') {
+    doLast {
+        def signing = android.signingConfigs.stable
+        if (!signing.storeFile.isFile()) {
+            throw new GradleException('固定签名密钥不存在，请按 docs/releasing.md 配置 LIBRETV_KEYSTORE')
+        }
+        def store = java.security.KeyStore.getInstance(signing.storeFile, signing.storePassword.toCharArray())
+        def certificate = store.getCertificate(signing.keyAlias)
+        if (certificate == null || !store.isKeyEntry(signing.keyAlias)) {
+            throw new GradleException('签名密钥中不存在 androiddebugkey 私钥')
+        }
+        def actual = java.security.MessageDigest.getInstance('SHA-256').digest(certificate.encoded).encodeHex().toString()
+        def expected = rootProject.file('signing-certificate.sha256').text.trim()
+        if (actual != expected) {
+            throw new GradleException("签名证书不匹配：期望 ${expected}，实际 ${actual}")
+        }
+        logger.lifecycle("固定签名证书 SHA-256: ${actual}")
+    }
+}
+tasks.named('preBuild').configure { dependsOn verifyStableSigning }
 
 dependencies {
     implementation 'androidx.media3:media3-exoplayer:1.5.1'

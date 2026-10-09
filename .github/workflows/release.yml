@@ -63,6 +63,8 @@ jobs:
     if: needs.check-version.outputs.changed == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      LIBRETV_KEYSTORE: ${{ runner.temp }}/libretv-signing/debug.keystore
     steps:
       - name: Checkout source
         uses: actions/checkout@v6
@@ -85,9 +87,9 @@ jobs:
             echo '::error::请先配置 ANDROID_DEBUG_KEYSTORE_BASE64 仓库 Secret，见 docs/releasing.md'
             exit 1
           fi
-          mkdir -p "$HOME/.android"
-          printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
-          chmod 600 "$HOME/.android/debug.keystore"
+          mkdir -p "$(dirname "$LIBRETV_KEYSTORE")"
+          printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$LIBRETV_KEYSTORE"
+          chmod 600 "$LIBRETV_KEYSTORE"
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
@@ -97,6 +99,17 @@ jobs:
 
       - name: Build and lint
         run: bash ./gradlew --no-daemon assembleDebug lintDebug
+
+      # 验证最终产物，而不只验证输入密钥。
+      - name: Verify APK signing certificate
+        run: |
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs app/build/outputs/apk/debug/app-debug.apk > "$RUNNER_TEMP/apk-certificate.txt"
+          expected=$(tr -d '\r\n' < signing-certificate.sha256)
+          actual=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/apk-certificate.txt")
+          if [ "$actual" != "$expected" ]; then
+            echo '::error::APK 签名与固定证书不一致，停止发布'
+            exit 1
+          fi
 
       - name: Package APK and checksum
         id: package
@@ -153,4 +166,4 @@ jobs:
 
       - name: Remove signing key
         if: always()
-        run: rm -f "$HOME/.android/debug.keystore"
+        run: rm -f "$LIBRETV_KEYSTORE"

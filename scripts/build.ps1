@@ -22,10 +22,25 @@ try {
         throw '无法确定唯一的 APK 输出和版本号'
     }
     $tvVersion = $tvOutputs[0].versionName
+    $tvBuiltApk = Join-Path $tvApkDirectory $tvOutputs[0].outputFile
+    $tvSdk = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { $env:ANDROID_SDK_ROOT }
+    if (-not $tvSdk -and (Test-Path 'local.properties')) {
+        $tvSdkProperty = Get-Content 'local.properties' | Select-String '^sdk\.dir\s*=\s*(.+)$' | Select-Object -First 1
+        if ($tvSdkProperty) { $tvSdk = $tvSdkProperty.Matches[0].Groups[1].Value.Replace('\:', ':').Replace('\\', '\') }
+    }
+    if (-not $tvSdk) { throw '无法定位 Android SDK，请设置 ANDROID_HOME 或 local.properties' }
+    $tvApkSigner = Join-Path $tvSdk 'build-tools/34.0.0/apksigner.bat'
+    $tvCertificateOutput = & $tvApkSigner verify --print-certs $tvBuiltApk
+    if ($LASTEXITCODE -ne 0) { throw 'APK 签名校验失败' }
+    $tvCertificate = @($tvCertificateOutput | Select-String '^Signer #1 certificate SHA-256 digest: (.+)$')
+    $tvExpectedCertificate = (Get-Content 'signing-certificate.sha256' -Raw).Trim()
+    if ($tvCertificate.Count -ne 1 -or $tvCertificate[0].Matches[0].Groups[1].Value -cne $tvExpectedCertificate) {
+        throw 'APK 签名与固定证书不一致，停止复制发布产物'
+    }
     $tvApkName = "LibreTV-Home-$tvVersion.apk"
     $tvApkPath = Join-Path $tvProject "dist/$tvApkName"
     New-Item -ItemType Directory -Force dist | Out-Null
-    Copy-Item (Join-Path $tvApkDirectory $tvOutputs[0].outputFile) $tvApkPath -Force
+    Copy-Item $tvBuiltApk $tvApkPath -Force
     $tvHash = Get-FileHash $tvApkPath -Algorithm SHA256
     "$($tvHash.Hash.ToLowerInvariant())  $tvApkName" | Set-Content "dist/SHA256-$tvVersion.txt" -Encoding ascii
     $tvHash

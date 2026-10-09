@@ -4,7 +4,7 @@
 
 ## 安装
 
-从 [GitHub Releases](https://github.com/gcdxuzhiwei/LibreTV-Home/releases) 的版本附件（Assets）下载 APK；发布后即可在这里下载安装包。当前本地构建生成 `dist/LibreTV-Home-1.1.5.apk`，这是已签名的个人使用调试版，可直接侧载安装。`dist` 仅保存本地产物，不提交到源码仓库。
+从 [GitHub Releases](https://github.com/gcdxuzhiwei/LibreTV-Home/releases) 的版本附件（Assets）下载 APK；发布后即可在这里下载安装包。当前本地构建生成 `dist/LibreTV-Home-1.1.6.apk`，这是已签名的个人使用调试版，可直接侧载安装。`dist` 仅保存本地产物，不提交到源码仓库。从 1.1.6 起固定签名，后续可覆盖升级；此前 GitHub 版本的签名不同，需要卸载后重新安装一次。
 
 1. 将 APK 复制到 U 盘，插入电视。
 2. 在电视设置中允许相应文件管理器安装未知来源应用；不同 MIUI TV 版本入口不同。
@@ -14,7 +14,7 @@
 
 ```powershell
 adb connect 电视IP:5555
-adb install -r .\LibreTV-Home-1.1.5.apk
+adb install -r .\LibreTV-Home-1.1.6.apk
 ```
 
 APK 不含原生 CPU 库，适用于 32 位 / 64 位 ARM 和 x86 设备。具体系统、解码器和安装权限仍取决于电视型号。本项目不要求 Google Play 服务。
@@ -49,7 +49,7 @@ Android Studio 打开项目，使用 JDK 17、Android SDK 35。命令行：
 .\scripts\build.ps1
 ```
 
-构建脚本使用项目目录的 `.tools` 工具与 Gradle 缓存，从构建元数据读取版本号，将 APK 复制到 `dist/LibreTV-Home-<版本号>.apk`，并生成 `dist/SHA256-<版本号>.txt`。其他环境需要设置 `JAVA_HOME`、`ANDROID_HOME` 或 `local.properties`。首次构建需要下载 Gradle / Maven 依赖；这是开发时依赖，App 运行不需要构建环境。没有提交密钥；正式发布应配置自己的 release 签名并保持升级签名一致。
+构建脚本使用项目目录的 `.tools` 工具与 Gradle 缓存，从构建元数据读取版本号，校验 APK 签名后复制到 `dist/LibreTV-Home-<版本号>.apk`，并生成 `dist/SHA256-<版本号>.txt`。其他环境需要设置 `JAVA_HOME`、`ANDROID_HOME` 或 `local.properties`。固定密钥需恢复到 `.tools/signing/debug.keystore`，或通过 `LIBRETV_KEYSTORE` 指定路径，详见 [发布说明](docs/releasing.md)。首次构建需要下载 Gradle / Maven 依赖；这是开发时依赖，App 运行不需要构建环境。没有提交密钥；正式发布应配置自己的 release 签名并保持升级签名一致。
 
 ## 项目结构与发布
 
