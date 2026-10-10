@@ -2,6 +2,14 @@
 
 以下 `dist` 路径表示验证时的本地产物，已由 `.gitignore` 排除。公开下载使用 GitHub Release 附件，发布步骤见 [发布说明](releasing.md)。历史校验文件可能同时包含 APK 和源码归档；当前构建脚本生成的校验文件仅包含 APK。
 
+## 小米 Android 6 实机网络排查与本地测试版
+
+2026-10-10：通过 ADB 在 MiTV4-ANSM0 / Android 6.0.1 / 已安装 1.2.1 上取得缺少信任根的播放错误。补充官方 ISRG Root X1，并让 React Native 图片请求继承统一网络客户端。实际兼容类与 OkHttp 4.12.0 生成独立 API 23 DEX 在电视执行：量子 HLS 与暴风 JPEG 从证书失败变为 HTTP 200，不受信任的自签名证书仍被拒绝。非凡、量子封面另有网络拦截；此前截图的 404 未复现。
+
+随后按用户授权准备本地构建工具，以独立临时密钥构建 1.2.1 测试版；类型检查、assembleDebug 与 lintDebug 通过（0 errors / 11 warnings），APK 签名及上传后的 SHA-256 校验通过。备份原 APK 和应用数据，卸载原应用，安装测试版并恢复观看记录与源设置。首页当前非凡资源多个封面正常显示，量子《超级夜总会》20220702 加载时长并持续播放，用户确认电视画面和声音正常。APK 为 `dist/LibreTV-Home-1.2.1-local-test.apk`；没有替换正式签名密钥或发布。详情见 [网络兼容记录](network-compatibility.md)。
+
+进一步按用户要求保持设备独立运行，新增封面失败后向其他已启用 CMS 精确匹配图片的设备端补全。电视 DEX 测试确认同名不同年份、类型、季数及资料缺失时不会误匹配，三个封面能直接下载。完整类型检查、assembleDebug 与 lintDebug 通过（0 errors / 11 warnings）。`dist/LibreTV-Home-1.2.1-coverfix-local-test.apk` 覆盖安装成功，截图确认量子首页与非凡第二页的各六张可见封面恢复；无需电脑或代理，播放来源保留。未重复验证视频播放或全部来源/影片。
+
 ## 1.2.1：统一弹窗与焦点按钮
 
 2026-10-10：版本更新为 1.2.1 / versionCode 15，同步 npm 项目版本、README 和更新日志；“关于”标题通过 `BuildConfig.VERSION_NAME` 自动显示应用版本。

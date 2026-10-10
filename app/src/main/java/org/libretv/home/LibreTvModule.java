@@ -19,6 +19,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public final class LibreTvModule extends ReactContextBaseJavaModule {
     private final ThreadPoolExecutor workers = (ThreadPoolExecutor) Executors.newFixedThreadPool(4);
+    // 图片补全单独限流，不能占满列表、详情和播放使用的任务线程。
+    private final ThreadPoolExecutor coverWorkers = new ThreadPoolExecutor(2, 2, 0,
+            java.util.concurrent.TimeUnit.MILLISECONDS, new java.util.concurrent.ArrayBlockingQueue<>(32));
     private final List<PendingRequest> pending = new ArrayList<>();
     private final LocalStore store;
     LibreTvModule(ReactApplicationContext context) { super(context); store = new LocalStore(context); }
@@ -68,6 +71,7 @@ public final class LibreTvModule extends ReactContextBaseJavaModule {
                 if (item.group.equals(group)) { item.cancel(); pending.remove(item); }
             }
             workers.purge();
+            coverWorkers.purge();
         }
     }
     private Catalog.Source source(String json) throws Exception {
@@ -80,6 +84,20 @@ public final class LibreTvModule extends ReactContextBaseJavaModule {
             for (Catalog.Source item : store.sources()) rows.put(item.json());
             return rows.toString();
         });
+    }
+    @ReactMethod public void coverCandidates(String json, String requestId, Promise promise) {
+        synchronized (pending) {
+            PendingRequest item = new PendingRequest("cover:" + requestId, promise, () ->
+                    CoverFallback.candidates(Catalog.Video.from(new JSONObject(json)), store.sources()));
+            pending.add(item);
+            try {
+                coverWorkers.execute(item.future);
+            } catch (java.util.concurrent.RejectedExecutionException error) {
+                pending.remove(item);
+                if (item.settled.compareAndSet(false, true))
+                    promise.reject("COVER_BUSY", "封面补全队列繁忙，请稍后重试", error);
+            }
+        }
     }
     @ReactMethod public void page(String json, String keyword, String category, int number, Promise promise) {
         request("page", promise, () -> {
@@ -136,6 +154,7 @@ public final class LibreTvModule extends ReactContextBaseJavaModule {
         });
     }
     @Override public void invalidate() {
+        coverWorkers.shutdownNow();
         synchronized (pending) {
             for (PendingRequest item : pending) item.cancel();
             pending.clear(); workers.shutdownNow();

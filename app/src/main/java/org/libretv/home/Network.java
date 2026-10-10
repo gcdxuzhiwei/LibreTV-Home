@@ -7,6 +7,9 @@ import java.security.cert.CertificateException;
 import java.util.concurrent.TimeUnit;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import okhttp3.OkHttpClient;
 import okhttp3.Call;
 import okhttp3.Request;
@@ -38,7 +41,7 @@ public final class Network {
         if (scope != null) scope.add(call);
         return call;
     }
-    public static final OkHttpClient CLIENT = new OkHttpClient.Builder()
+    public static volatile OkHttpClient CLIENT = new OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
             .writeTimeout(20, TimeUnit.SECONDS)
@@ -46,6 +49,19 @@ public final class Network {
             .followSslRedirects(true)
             .retryOnConnectionFailure(true)
             .build();
+
+    /** 在 Application 启动时执行，先于 CMS、Media3 和 React Native 图片请求。 */
+    static void initialize(android.content.Context context) {
+        try (java.io.InputStream root = context.getResources().openRawResource(R.raw.isrg_root_x1)) {
+            X509TrustManager trust = CompatibleTrust.create(root);
+            SSLContext tls = SSLContext.getInstance("TLS");
+            tls.init(null, new TrustManager[]{trust}, null);
+            CLIENT = CLIENT.newBuilder().sslSocketFactory(tls.getSocketFactory(), trust).build();
+        } catch (java.io.IOException | java.security.GeneralSecurityException error) {
+            // 根证书加载失败仍使用系统校验，不能退化为信任所有证书。
+            android.util.Log.e("LibreTVNetwork", "加载兼容根证书失败", error);
+        }
+    }
 
     public static String describe(Throwable error) {
         String reason = null;

@@ -1,6 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
-  AccessibilityInfo, Alert, Animated, AppState, BackHandler, FlatList, Image,
+  AccessibilityInfo, Alert, Animated, AppState, BackHandler, FlatList,
   Pressable, StyleSheet, Text, TextInput, TVFocusGuideView,
   findNodeHandle, useWindowDimensions, View,
 } from 'react-native';
@@ -8,12 +8,12 @@ import {api, Category, Detail, History, keyOf, Source, titleOf, Video} from './a
 import {ExitDialog} from './ExitDialog';
 import {FocusButton} from './FocusButton';
 import {SelectionDialog} from './SelectionDialog';
+import {CoverImage, CoverSourcesContext} from './CoverImage';
 
 const C = {bg: '#0B1018', panel: '#182230', text: '#F4F7FA', muted: '#96A6BB', accent: '#DCF763'};
 const message = (error: unknown) => error instanceof Error ? error.message : String(error);
 const field = (video: Video, name: string) => String(video.vod[name] || '');
 const description = (video: Video) => field(video, 'vod_content').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').trim();
-const cover = (video: Video) => ({uri: field(video, 'vod_pic'), headers: {'User-Agent': 'Mozilla/5.0 (Linux; Android 9) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36'}});
 
 function useReducedMotion() {
   const [reduced, setReduced] = useState(true);
@@ -32,7 +32,6 @@ function Poster({video, width, onPress, onFocus, preferred, progress, reduced, n
   posterRef?: React.Ref<View>;
 }) {
   const [focused, setFocused] = useState(false);
-  const [failed, setFailed] = useState(false);
   const scale = useRef(new Animated.Value(1)).current;
   const animate = (active: boolean) => {
     setFocused(active);
@@ -46,8 +45,8 @@ function Poster({video, width, onPress, onFocus, preferred, progress, reduced, n
     hasTVPreferredFocus={preferred} onPress={onPress} onFocus={() => {animate(true); onFocus();}}
     onBlur={() => animate(false)} style={{width, margin: 9}}>
     <Animated.View style={[s.poster, focused && s.posterFocus, {height: width * 1.38, transform: [{scale}]}]}>
-      {!!field(video, 'vod_pic') && !failed ? <Image source={cover(video)} style={StyleSheet.absoluteFill} resizeMode="cover" onError={() => setFailed(true)} />
-        : <View style={s.posterFallback}><Text style={s.fallbackLetter}>▶</Text><Text style={s.fallbackTitle}>{titleOf(video)}</Text></View>}
+      <CoverImage video={video} style={StyleSheet.absoluteFill} resizeMode="cover"
+        fallback={<View style={s.posterFallback}><Text style={s.fallbackLetter}>▶</Text><Text style={s.fallbackTitle}>{titleOf(video)}</Text></View>} />
       <View style={s.posterBadge}><Text numberOfLines={1} style={s.badgeText}>{field(video, 'vod_remarks') || video.source.name}</Text></View>
       {percent > 0 && <View style={s.progressTrack}><View style={[s.progressFill, {width: `${percent}%`}]} /></View>}
     </Animated.View>
@@ -59,7 +58,7 @@ function Poster({video, width, onPress, onFocus, preferred, progress, reduced, n
 function Hero({video, detail = false, children}: {video?: Video; detail?: boolean; children?: React.ReactNode}) {
   const compact = useWindowDimensions().height < 600;
   return <View style={[s.hero, detail && s.detailHero, compact && {height: detail ? 235 : 105}]}>
-    {video && !!field(video, 'vod_pic') && <Image source={cover(video)} blurRadius={16} style={s.heroImage} resizeMode="cover" />}
+    {video && <CoverImage video={video} blurRadius={16} style={s.heroImage} resizeMode="cover" />}
     <View style={s.heroShade} />
     <View style={[s.heroCopy, compact && {padding: 14, gap: 4}]}>
       <Text style={s.eyebrow}>{detail ? 'LIBRETV / NOW SHOWING' : 'YOUR PERSONAL CINEMA'}</Text>
@@ -68,7 +67,7 @@ function Hero({video, detail = false, children}: {video?: Video; detail?: boolea
       {(!compact || detail) && <Text numberOfLines={detail ? 3 : 2} style={s.heroDescription}>{video ? description(video) || '选择影片查看详情与播放线路。' : '用遥控器探索你的家庭影院。'}</Text>}
       {children}
     </View>
-    {video && !!field(video, 'vod_pic') && <Image source={cover(video)} style={[s.heroPoster, detail && !compact && {width: 160, height: 237, top: 24}, compact && !detail && {width: 58, height: 86, top: 9}]} resizeMode="cover" />}
+    {video && <CoverImage video={video} style={[s.heroPoster, detail && !compact && {width: 160, height: 237, top: 24}, compact && !detail && {width: 58, height: 86, top: 9}]} resizeMode="cover" />}
   </View>;
 }
 
@@ -78,6 +77,7 @@ export default function App() {
   const columns = Math.max(3, Math.min(7, Math.floor((width - 64) / (height < 600 ? 140 : 150))));
   const posterWidth = (width - 82) / columns - 18;
   const [sources, setSources] = useState<Source[]>([]);
+  const coverSources = useMemo(() => JSON.stringify(sources.filter(item => item.enabled).map(item => item.url)), [sources]);
   const [source, setSource] = useState<Source>();
   const [category, setCategory] = useState<Category>({id: '', name: '全部分类'});
   const [categories, setCategories] = useState<Category[]>([]);
@@ -245,7 +245,7 @@ export default function App() {
     : picker === 'category' ? [{id: '', name: '全部分类'}, ...categories]
       : (detail?.lines || []).map((item, i) => ({id: String(i), name: `${item.name} · ${item.episodes.length} 集`}));
 
-  return <View style={s.app}>
+  return <CoverSourcesContext.Provider value={coverSources}><View style={s.app}>
     {exitVisible && <ExitDialog reduced={reduced} onDismiss={() => setExitVisible(false)} />}
     <TVFocusGuideView autoFocus style={[s.header, height < 600 && {height: 58}]}>
       <View style={s.brand}><Text style={s.brandIcon}>▶</Text><Text style={s.brandName}>Libre<Text style={s.accent}>TV</Text></Text><Text style={s.brandLabel}>家庭影院</Text></View>
@@ -332,7 +332,7 @@ export default function App() {
           else if (picker === 'category') setCategory(item);
           else setLine(Number(item.id));
       }} />}
-  </View>;
+  </View></CoverSourcesContext.Provider>;
 }
 
 const s = StyleSheet.create({

@@ -14,6 +14,8 @@ export const titleOf = (video: Video) => String(video.vod.vod_name || '未命名
 export const api = {
   cancelRequests: (group: 'page' | 'categories' | 'detail') => native.cancelRequests(group),
   sources: () => json<Source[]>(native.sources()),
+  coverCandidates: (video: Video, requestId: string) => json<string[]>(native.coverCandidates(JSON.stringify(video), requestId)),
+  cancelCoverRequest: (requestId: string) => native.cancelRequests(`cover:${requestId}`),
   page: (source: Source, keyword: string, category: string, page: number) =>
     json<Page>(native.page(JSON.stringify(source), keyword, category, page)),
   categories: (source: Source) => json<Category[]>(native.categories(JSON.stringify(source))),

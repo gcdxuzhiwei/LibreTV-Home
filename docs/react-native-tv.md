@@ -18,7 +18,7 @@
 
 ## 版本与构建
 
-当前源码为 1.2.1 / versionCode 15，统一弹窗与焦点按钮的改动见 [更新日志](CHANGELOG.md#121)，本地验证见 [验证记录](validation.md#121统一弹窗与焦点按钮)。下方 1.2.0 版本与截图保留为改造时的历史记录。
+当前源码为 1.2.2 / versionCode 16，版本更新见 [更新日志](CHANGELOG.md#122)。1.2.1 统一弹窗与焦点按钮的本地验证见 [验证记录](validation.md#121统一弹窗与焦点按钮)。下方 1.2.0 版本与截图保留为改造时的历史记录。
 
 固定 React 18.3.1 / `react-native-tvos` 0.75.4-0，仍支持 API 23。使用旧架构 NativeModule 与 Hermes；不同时安装标准 React Native。`.npmrc` 的 `legacy-peer-deps` 避免 TV 虚拟列表的 peer dependency 再安装另一个标准或最新 TV 包。锁文件用于固定依赖。
 
