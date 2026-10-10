@@ -20,9 +20,9 @@
 
 ## 自动发布（推送到 main 且版本变化）
 
-`.github/workflows/release.yml` 在推送到 `main` 后，先比较整次推送前后的 `app/build.gradle`：只有 `versionCode` 或 `versionName` 变化，才执行构建与 Lint，成功后创建一个 GitHub **预发布版本**并上传 APK 和 SHA256 文件。版本未变化时，仅运行版本检查，跳过 APK 构建和发布；改动 App 代码但未更新版本也会跳过。首次推送允许构建，也可在 Actions 页面手动运行，手动运行不受版本变化限制。仅本地 `git commit` 不触发；一次 push 包含多个提交时，比较推送前后的版本，只构建该次推送的最后一个提交。其他分支不自动发布。
+`.github/workflows/release.yml` 在推送到 `main` 后，先比较整次推送前后的 `app/build.gradle`：只有 `versionCode` 或 `versionName` 变化，才执行构建与 Lint，成功后创建一个正式 GitHub Release、标记为 **Latest** 并上传 APK 和 SHA256 文件。APK 仍为 debug 构建，GitHub 的正式发布标记不改变构建类型或签名。版本未变化时，仅运行版本检查，跳过 APK 构建和发布；改动 App 代码但未更新版本也会跳过。首次推送允许构建，也可在 Actions 页面手动运行，手动运行不受版本变化限制。仅本地 `git commit` 不触发；一次 push 包含多个提交时，比较推送前后的版本，只构建该次推送的最后一个提交。其他分支不自动发布。
 
-版本 tag 采用 `build-<运行编号>-<提交短哈希>`，例如 `build-12-a1b2c3d`，绑定实际构建的完整提交。每次构建发布保留独立下载记录，不覆盖正式 `v1.1.3` 之类的版本，也不设置为正式 Latest；下载请打开 Releases 列表。重新运行同一个工作流时，若该构建已发布，则保留原有附件。
+版本 tag 采用与 `versionName` 对应的 `v<版本号>`，例如 `v1.1.10`，绑定实际构建的完整提交。标准版本标签便于 GitHub 正确比较同日发布的版本，避免 `build-9` 排在 `build-10` 前面。每个应用版本保留独立下载记录；重复运行时，若该版本已发布，则跳过发布并保留原有附件。需要发布新代码时，应同时更新应用版本。旧的 `build-*` 历史发布保留不变。
 
 ### 首次配置签名 Secret
 
@@ -42,7 +42,7 @@
 
 CI 将密钥恢复到 runner 的临时目录，并用 `LIBRETV_KEYSTORE` 明确传给 Gradle；任务结束时删除临时密钥。Secret 内容错误、证书指纹不匹配或 APK 签名校验失败时均不会发布附件。本地 SDK 需包含 Build Tools 34.0.0，以供打包脚本调用 `apksigner`。
 
-自动构建使用 `app/build.gradle` 中的版本号，不自动修改源码。正式升级时仍需递增 `versionCode`、更新 `versionName`；日常推送的预发布版本由构建 tag 区分。自动发布仅表示构建和 Lint 通过，不代表实体电视操作已验证。
+自动构建使用 `app/build.gradle` 中的版本号，不自动修改源码。每次升级都需递增 `versionCode`、更新 `versionName`，以创建新的版本 tag。自动发布仅表示构建和 Lint 通过，不代表实体电视操作已验证。
 
 ## GitHub 网页发布（正式版本）
 

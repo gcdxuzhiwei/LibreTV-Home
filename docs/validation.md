@@ -2,6 +2,10 @@
 
 以下 `dist` 路径表示验证时的本地产物，已由 `.gitignore` 排除。公开下载使用 GitHub Release 附件，发布步骤见 [发布说明](releasing.md)。历史校验文件可能同时包含 APK 和源码归档；当前构建脚本生成的校验文件仅包含 APK。
 
+## 1.1.10：发布标签与 Latest
+
+2026-10-10：`scripts/build.ps1` 的 `assembleDebug lintDebug` 通过，Lint 0 错误、8 个警告。构建元数据确认 1.1.10 / versionCode 12，APK 签名校验与固定证书一致。生成 `dist/LibreTV-Home-1.1.10.apk` 和 `dist/SHA256-1.1.10.txt`。`actionlint -shellcheck= -pyflakes= .github/workflows/release.yml` 与 `git diff --check` 通过。发布流程使用 `v<版本号>` 标签创建正式 Release，并通过 `--latest` 标记 Latest；尚未提交推送或运行远端 Actions，本次未进行设备安装与操作验证。
+
 ## 1.1.9：网络请求统一与电视错误诊断
 
 2026-10-10：`scripts/build.ps1` 的 `assembleDebug lintDebug` 通过，构建元数据确认 1.1.9 / versionCode 11，APK 签名校验与固定证书一致。生成 `dist/LibreTV-Home-1.1.9.apk` 和 `dist/SHA256-1.1.9.txt`。

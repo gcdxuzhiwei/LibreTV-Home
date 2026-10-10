@@ -127,11 +127,10 @@ jobs:
           if len(outputs) != 1:
               raise RuntimeError('Expected exactly one APK')
           version = outputs[0]['versionName']
-          commit = os.environ['GITHUB_SHA'][:7]
-          tag = f"build-{os.environ['GITHUB_RUN_NUMBER']}-{commit}"
+          tag = f'v{version}'
           dist = pathlib.Path('dist')
           dist.mkdir(exist_ok=True)
-          apk = dist / f'LibreTV-Home-{version}-{tag}.apk'
+          apk = dist / f'LibreTV-Home-{version}.apk'
           shutil.copyfile(apk_dir / outputs[0]['outputFile'], apk)
           checksum = hashlib.sha256(apk.read_bytes()).hexdigest()
           (dist / 'SHA256.txt').write_text(f'{checksum}  {apk.name}\n', encoding='ascii')
@@ -147,7 +146,7 @@ jobs:
           PY
 
       # 固定绑定本次提交；重复运行已发布的构建时不改写附件。
-      - name: Publish GitHub prerelease
+      - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -162,7 +161,7 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "LibreTV Home $APP_VERSION ($RELEASE_TAG)" \
             --notes-file release-notes.md \
-            --prerelease --latest=false
+            --latest
 
       - name: Remove signing key
         if: always()

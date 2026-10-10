@@ -4,7 +4,7 @@
 
 ## 安装
 
-从 [GitHub Releases](https://github.com/gcdxuzhiwei/LibreTV-Home/releases) 的版本附件（Assets）下载 APK；发布后即可在这里下载安装包。当前本地构建生成 `dist/LibreTV-Home-1.1.9.apk`，这是已签名的个人使用调试版，可直接侧载安装。`dist` 仅保存本地产物，不提交到源码仓库。从 1.1.6 起固定签名，后续可覆盖升级；此前 GitHub 版本的签名不同，需要卸载后重新安装一次。
+从 [GitHub Releases](https://github.com/gcdxuzhiwei/LibreTV-Home/releases) 的版本附件（Assets）下载 APK；发布后即可在这里下载安装包。当前本地构建生成 `dist/LibreTV-Home-1.1.10.apk`，这是已签名的个人使用调试版，可直接侧载安装。`dist` 仅保存本地产物，不提交到源码仓库。从 1.1.6 起固定签名，后续可覆盖升级；此前 GitHub 版本的签名不同，需要卸载后重新安装一次。
 
 1. 将 APK 复制到 U 盘，插入电视。
 2. 在电视设置中允许相应文件管理器安装未知来源应用；不同 MIUI TV 版本入口不同。
@@ -14,7 +14,7 @@
 
 ```powershell
 adb connect 电视IP:5555
-adb install -r .\LibreTV-Home-1.1.6.apk
+adb install -r .\LibreTV-Home-1.1.10.apk
 ```
 
 APK 不含原生 CPU 库，适用于 32 位 / 64 位 ARM 和 x86 设备。具体系统、解码器和安装权限仍取决于电视型号。本项目不要求 Google Play 服务。
@@ -70,7 +70,7 @@ LICENSE              项目许可
 
 每个发布版本将 APK 和校验文件上传到 GitHub Release 附件；源码随版本 tag 保存，GitHub 自动提供源码 ZIP / tar.gz，无需把每版 APK 和源码 ZIP 提交进 Git。操作步骤见 [发布说明](docs/releasing.md)，版本变化见 [更新日志](docs/CHANGELOG.md)。
 
-已配置 GitHub Actions：每次推送到 `main` 后，构建与 Lint 通过即发布一个独立的预发布版本。首次使用需按 [发布说明](docs/releasing.md#首次配置签名-secret) 设置 `ANDROID_DEBUG_KEYSTORE_BASE64`，确保安装包签名一致；本地提交尚未推送时不会触发。
+已配置 GitHub Actions：推送到 `main` 且应用版本变化时，构建与 Lint 通过后使用 `v<版本号>` 标签发布正式 GitHub Release，并标记 Latest；APK 仍为 debug 构建。首次使用需按 [发布说明](docs/releasing.md#首次配置签名-secret) 设置 `ANDROID_DEBUG_KEYSTORE_BASE64`，确保安装包签名一致；本地提交尚未推送时不会触发。
 
 ## 实现与许可
 
