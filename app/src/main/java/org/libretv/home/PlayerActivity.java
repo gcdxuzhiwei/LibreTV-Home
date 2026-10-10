@@ -72,7 +72,7 @@ public final class PlayerActivity extends Activity {
     private int dp(int v) { return Math.round(v*getResources().getDisplayMetrics().density); }
     private Button button(String label,Runnable action) {
         Button b=new Button(this); b.setText(label); b.setAllCaps(false); b.setTextSize(14); b.setTextColor(TvStyle.TEXT);
-        b.setTypeface(null,android.graphics.Typeface.BOLD); b.setStateListAnimator(null); TvStyle.focus(b,false);
+        b.setTypeface(null,android.graphics.Typeface.BOLD); b.setStateListAnimator(null); TvStyle.focus(b);
         b.setOnClickListener(v -> TvStyle.press(b,action));
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,dp(42)); lp.setMargins(dp(6),0,0,0); b.setLayoutParams(lp); return b;
     }

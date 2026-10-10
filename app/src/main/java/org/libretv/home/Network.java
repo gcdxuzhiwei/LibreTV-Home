@@ -8,9 +8,36 @@ import java.util.concurrent.TimeUnit;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import okhttp3.OkHttpClient;
+import okhttp3.Call;
+import okhttp3.Request;
+import java.util.ArrayList;
+import java.util.List;
 
 /** 接口、海报和媒体共享网络配置，保留系统证书与域名校验。 */
 public final class Network {
+    // 只取消当前桥接任务的 CMS 请求，不影响海报和正在播放的媒体。
+    private static final ThreadLocal<RequestScope> REQUEST_SCOPE = new ThreadLocal<>();
+    static final class RequestScope {
+        private final List<Call> calls = new ArrayList<>();
+        private boolean cancelled;
+        synchronized void add(Call call) {
+            if (cancelled) call.cancel();
+            else calls.add(call);
+        }
+        synchronized void cancel() {
+            cancelled = true;
+            for (Call call : calls) call.cancel();
+            calls.clear();
+        }
+    }
+    static void enter(RequestScope scope) { REQUEST_SCOPE.set(scope); }
+    static void leave() { REQUEST_SCOPE.remove(); }
+    static Call newCall(Request request) {
+        Call call = CLIENT.newCall(request);
+        RequestScope scope = REQUEST_SCOPE.get();
+        if (scope != null) scope.add(call);
+        return call;
+    }
     public static final OkHttpClient CLIENT = new OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)

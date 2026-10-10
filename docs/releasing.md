@@ -4,8 +4,10 @@
 
 ## 构建与版本
 
+构建环境需要 Node.js 22、JDK 17、Android SDK 35 和 Build Tools 34.0.0。首次构建先执行 `npm ci`，Android Studio / Gradle 同步也依赖 `node_modules` 中的 React Native 插件。`scripts/build.ps1` 会在缺少依赖时安装，并在 Android 构建前执行 TypeScript 检查；APK 内包含 JS 与 Hermes，运行时无需 Metro。
+
 1. 在 `app/build.gradle` 更新 `versionName`，并递增 `versionCode`。
-2. 更新 `docs/CHANGELOG.md`，运行 `./scripts/build.ps1`。脚本执行 `assembleDebug lintDebug`，然后按构建的实际版本号生成 APK 和 SHA256 文件。
+2. 同步 `package.json` 与锁文件中的项目版本、`docs/CHANGELOG.md`，运行 `./scripts/build.ps1`。脚本执行类型检查、`assembleDebug lintDebug`，然后按构建的实际版本号生成 APK 和 SHA256 文件。
 3. 核验安装包版本、签名、安装与遥控器操作，并将结果记录到 `docs/validation.md`。
 
 当前脚本生成 **debug APK**，不是正式 release 签名包。若分发该包，请在发布说明中标明调试版。长期公开发行应先配置自己的 release 签名，并安全备份密钥；覆盖安装要求签名一致。密钥和密码不放入仓库，其他电脑或 CI 的默认 debug 密钥也不保证与已有安装包一致。

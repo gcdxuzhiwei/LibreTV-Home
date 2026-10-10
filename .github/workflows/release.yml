@@ -76,6 +76,15 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install TV interface dependencies
+        run: npm ci && npm run typecheck
+
       # 每次使用相同密钥，保证自动构建之间及与现有本地 APK 的签名一致。
       - name: Restore signing key
         env:

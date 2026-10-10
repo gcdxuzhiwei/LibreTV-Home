@@ -1,4 +1,12 @@
 <resources>
+    <style name="ReactTVTheme" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="colorAccent">#DCF763</item>
+        <item name="android:windowBackground">#0B1018</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:alertDialogTheme">@style/TVDialogTheme</item>
+    </style>
     <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:colorAccent">#DCF763</item>

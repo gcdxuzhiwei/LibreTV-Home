@@ -1,4 +1,14 @@
-plugins { id 'com.android.application' }
+plugins { id 'com.android.application'; id 'com.facebook.react' }
+
+react {
+    root = file('..')
+    reactNativeDir = file('../node_modules/react-native')
+    codegenDir = file('../node_modules/@react-native/codegen')
+    cliFile = file('../node_modules/react-native/cli.js')
+    // 安装 APK 即可运行；debug 也打包 JS，无需连接 Metro。
+    debuggableVariants = []
+    autolinkLibrariesWithApp()
+}
 
 android {
     namespace 'org.libretv.home'
@@ -7,10 +17,11 @@ android {
         applicationId 'org.libretv.home'
         minSdk 23
         targetSdk 35
-        versionCode 13
-        versionName '1.1.11'
+        versionCode 14
+        versionName '1.2.0'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    packaging { jniLibs { useLegacyPackaging = true } }
     // 使用明确的密钥路径，避免不同构建环境自动生成 debug 密钥。
     signingConfigs {
         stable {
@@ -48,6 +59,8 @@ def verifyStableSigning = tasks.register('verifyStableSigning') {
 tasks.named('preBuild').configure { dependsOn verifyStableSigning }
 
 dependencies {
+    implementation 'com.facebook.react:react-android'
+    implementation 'com.facebook.react:hermes-android'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'androidx.media3:media3-datasource-okhttp:1.5.1'
     implementation 'androidx.media3:media3-exoplayer:1.5.1'

@@ -32,7 +32,6 @@ public final class Catalog {
         public String id() { return raw.optString("vod_id"); }
         public String title() { return raw.optString("vod_name", "未命名影片"); }
         public String key() { return source.url + "|" + id(); }
-        public String meta() { return raw.optString("vod_year") + "  " + raw.optString("type_name") + "  " + raw.optString("vod_remarks"); }
         public JSONObject json() throws Exception { return new JSONObject().put("source", source.json()).put("vod", raw); }
         public static Video from(JSONObject obj) throws Exception {
             JSONObject s = obj.getJSONObject("source");
@@ -50,7 +49,6 @@ public final class Catalog {
     }
     public static final class Page {
         public final List<Video> videos = new ArrayList<>();
-        public final List<String[]> categories = new ArrayList<>();
         public int pages = 1;
     }
     public static boolean http(String url) {
@@ -60,7 +58,7 @@ public final class Catalog {
     public static byte[] get(String address, int limit) throws Exception {
         if (!http(address)) throw new Exception("地址需要以 http:// 或 https:// 开头");
         Request request = new Request.Builder().url(address).header("User-Agent", UA).header("Accept", "*/*").build();
-        try (Response response = Network.CLIENT.newCall(request).execute()) {
+        try (Response response = Network.newCall(request).execute()) {
             if (!response.isSuccessful()) throw new Exception("HTTP " + response.code());
             ResponseBody body = response.body();
             if (body == null) throw new Exception("服务器返回空响应");
@@ -100,7 +98,6 @@ public final class Catalog {
             JSONObject v = list.optJSONObject(i);
             if (v != null && !v.optString("vod_id").isEmpty() && !adult(v.optString("type_name"))) result.videos.add(new Video(source, v));
         }
-        result.categories.addAll(parseCategories(data.optJSONArray("class")));
         return result;
     }
     public static List<String[]> categories(Source s) throws Exception {

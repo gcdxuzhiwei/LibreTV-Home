@@ -1,0 +1,25 @@
+{
+  "name": "libretv-home",
+  "version": "1.2.0",
+  "private": true,
+  "scripts": {
+    "start": "node node_modules/react-native/cli.js start",
+    "typecheck": "tsc --noEmit",
+    "prebundle:android": "node -e \"require('fs').mkdirSync('.tools/rn-preview', {recursive: true})\"",
+    "bundle:android": "node node_modules/react-native/cli.js bundle --platform android --dev false --entry-file index.js --bundle-output .tools/rn-preview/index.android.bundle --assets-dest .tools/rn-preview"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-native": "npm:react-native-tvos@0.75.4-0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@react-native/babel-preset": "0.75.4",
+    "@react-native/metro-config": "0.75.4",
+    "@react-native-community/cli": "14.1.0",
+    "@react-native-community/cli-platform-android": "14.1.0",
+    "@types/react": "^18.3.3",
+    "typescript": "~5.6.3"
+  },
+  "engines": { "node": ">=18" }
+}

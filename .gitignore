@@ -3,8 +3,6 @@
 /.gradle/
 **/build/
 /captures/
-/.externalNativeBuild/
-/.cxx/
 **/.externalNativeBuild/
 **/.cxx/
 
@@ -30,5 +28,16 @@ Thumbs.db
 /.env.*
 !/.env.example
 
-# 本地上游参考工作区；docs 中的参考源码仍提交
+# 本地上游参考工作区
 /upstream/
+
+# React Native 依赖与 Metro 缓存
+/node_modules/
+/.metro-cache/
+/coverage/
+*.tsbuildinfo
+.eslintcache
+
+# 构建与调试日志、JVM 内存转储
+*.log
+*.hprof

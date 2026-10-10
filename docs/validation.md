@@ -2,6 +2,18 @@
 
 以下 `dist` 路径表示验证时的本地产物，已由 `.gitignore` 排除。公开下载使用 GitHub Release 附件，发布步骤见 [发布说明](releasing.md)。历史校验文件可能同时包含 APK 和源码归档；当前构建脚本生成的校验文件仅包含 APK。
 
+## 1.2.0：代码与文档清理
+
+2026-10-10：移除旧 Java 浏览页面，将原生影视源管理提取为 `SettingsActivity`。以下为本次清理后的验证；其余章节是对应旧版本的历史记录，不表示当前版本重新覆盖了全部场景。
+
+- `npm run typecheck` 通过，已启用 `noUnusedLocals` / `noUnusedParameters`。
+- Gradle `assembleDebug lintDebug` 通过（`--no-daemon --max-workers=2 -Dorg.gradle.vfs.watch=false`），Lint 0 errors / 9 warnings；APK 的 `apksigner` 校验通过，证书 SHA-256 与 `signing-certificate.sha256` 一致。
+- Android TV API 30 模拟器覆盖安装成功，首页列表与海报显示正常；从 React Native 进入 `SettingsActivity` 后可显示已有来源，按返回回到 `TvActivity`。详情显示线路与 17 集选集，已有继续观看记录仍可显示。本次未重新验证视频播放和源增删操作。
+- 重新截取 1280×720 首页与详情图，更新 `docs/screenshots/home-rn-tv.png`、`detail-rn-tv.png` 和 README 引用。
+- 遥控器 C# 源码编译到 `.tools/LibreTV-Remote-cleanup.exe` 通过；根目录 `LibreTV-Remote.exe` 正在运行，未覆盖，关闭后可运行 `scripts/build-remote.ps1` 更新。
+- `actionlint -shellcheck= -pyflakes= .github/workflows/release.yml`、Markdown 本地链接检查、`git diff --check` 通过；缓存、日志、APK 与私有配置的忽略规则检查通过，`.env.example` 可提交。
+- 本次未验证实体电视或远端 GitHub Actions，未提交、推送或发布。
+
 ## 1.1.10：发布标签与 Latest
 
 2026-10-10：`scripts/build.ps1` 的 `assembleDebug lintDebug` 通过，Lint 0 错误、8 个警告。构建元数据确认 1.1.10 / versionCode 12，APK 签名校验与固定证书一致。生成 `dist/LibreTV-Home-1.1.10.apk` 和 `dist/SHA256-1.1.10.txt`。`actionlint -shellcheck= -pyflakes= .github/workflows/release.yml` 与 `git diff --check` 通过。发布流程使用 `v<版本号>` 标签创建正式 Release，并通过 `--latest` 标记 Latest；尚未提交推送或运行远端 Actions，本次未进行设备安装与操作验证。
@@ -137,7 +149,7 @@ Android TV API 30 / x86 / 1280×720，无窗口运行：
 - 最终版本从第 2 集保存位置恢复播放，控制条显示约 00:22，加载后出现实际视频画面。
 - 未观察到应用崩溃日志。
 
-截图位于 `docs/screenshots/`。播放画面仅用于本地验证，未将影片片段打包到 APK。
+旧版动效截图保留为 `docs/screenshots/home-1.1.png` 与 `detail-1.1.png`，最初的首页与搜索截图已清理。播放画面仅用于本地验证，未将影片片段打包到 APK。
 
 ## 固定签名构建（1.1.6）
 

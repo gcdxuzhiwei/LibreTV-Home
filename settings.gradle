@@ -1,4 +1,9 @@
-pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
-dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
+pluginManagement { includeBuild('node_modules/@react-native/gradle-plugin'); repositories { google(); mavenCentral(); gradlePluginPortal() } }
+plugins { id('com.facebook.react.settings') }
+extensions.configure(com.facebook.react.ReactSettingsExtension) { extension ->
+    extension.autolinkLibrariesFromCommand(['node', 'node_modules/react-native/cli.js', 'config'], file('.'), files('package-lock.json', 'package.json', 'react-native.config.js'))
+}
+dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS); repositories { google(); mavenCentral(); maven { url "$rootDir/node_modules/react-native/android" } } }
 rootProject.name = 'LibreTV-Home'
 include ':app'
+includeBuild('node_modules/@react-native/gradle-plugin')

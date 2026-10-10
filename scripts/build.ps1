@@ -2,6 +2,12 @@ $ErrorActionPreference = 'Stop'
 $tvProject = Split-Path $PSScriptRoot -Parent
 Push-Location $tvProject
 try {
+    if (-not (Test-Path 'node_modules/react-native/package.json')) {
+        & npm.cmd ci
+        if ($LASTEXITCODE -ne 0) { throw 'React Native TV 依赖安装失败' }
+    }
+    & npm.cmd run typecheck
+    if ($LASTEXITCODE -ne 0) { throw 'React Native TV 类型检查失败' }
     $tvBundledJdk = Get-ChildItem '.tools/jdk' -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($tvBundledJdk) { $env:JAVA_HOME = $tvBundledJdk.FullName }
     if (Test-Path '.tools/android-sdk') {
