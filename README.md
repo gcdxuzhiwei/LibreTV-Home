@@ -2,7 +2,7 @@
 
 面向电视与遥控器的 Android 影视应用，使用 React Native TV 界面与原生 Media3 播放器，基于 [LibreSpark/LibreTV](https://github.com/LibreSpark/LibreTV) 的苹果 CMS 采集协议重新实现。最低安装要求为 Android 6.0（API 23）；实体电视兼容性仍需验证。
 
-当前源码为 **1.2.0**，React Native TV 改造的本地验证见 [改造记录](docs/react-native-tv.md)。截图展示当前界面，公开下载版本以 Releases 页面实际附件为准。
+当前源码为 **1.2.1**，React Native TV 改造的本地验证见 [改造记录](docs/react-native-tv.md)。截图展示当前界面，公开下载版本以 Releases 页面实际附件为准。
 
 **无需账号或启动密码，无需部署网站、Docker 或应用后端。** 安装 APK 后即可浏览、搜索和播放第三方影视源提供的内容，仍需互联网与可用片源。
 
@@ -43,10 +43,10 @@
 
 ```powershell
 adb connect 192.168.1.100:5555
-adb install -r .\LibreTV-Home-1.2.0.apk
+adb install -r .\LibreTV-Home-1.2.1.apk
 ```
 
-当前源码版本为 **1.2.0**，发布附件以 Releases 页面为准。APK 为已签名的 debug 构建，不要求 Google Play 服务。React Native TV 试验构建包含 32 / 64 位 ARM 与 x86 的原生库，安装权限与解码能力仍取决于设备。
+当前源码版本为 **1.2.1**，发布附件以 Releases 页面为准。APK 为已签名的 debug 构建，不要求 Google Play 服务。React Native TV 试验构建包含 32 / 64 位 ARM 与 x86 的原生库，安装权限与解码能力仍取决于设备。
 
 **覆盖升级**：从 1.1.6 起使用固定签名，可在签名一致且版本递增时覆盖安装。此前 GitHub 版本的签名不同，需要先卸载再安装一次；卸载会清除本机观看记录与源设置。
 
@@ -101,8 +101,8 @@ npm run typecheck
 脚本读取构建元数据中的版本号，校验 APK 签名后输出：
 
 ```text
-dist/LibreTV-Home-1.2.0.apk
-dist/SHA256-1.2.0.txt
+dist/LibreTV-Home-1.2.1.apk
+dist/SHA256-1.2.1.txt
 ```
 
 签名密钥放在 `.tools/signing/debug.keystore`，或通过 `LIBRETV_KEYSTORE` 指定路径。仓库只保存公开证书指纹，缺少密钥或证书不匹配时会停止构建。自行分发时需配置自己的密钥及对应指纹，并保持后续版本签名一致。首次构建需要下载 Gradle / Maven 依赖，应用运行无需构建环境。

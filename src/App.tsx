@@ -1,10 +1,13 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   AccessibilityInfo, Alert, Animated, AppState, BackHandler, FlatList, Image,
-  Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TVFocusGuideView,
+  Pressable, StyleSheet, Text, TextInput, TVFocusGuideView,
   findNodeHandle, useWindowDimensions, View,
 } from 'react-native';
 import {api, Category, Detail, History, keyOf, Source, titleOf, Video} from './api';
+import {ExitDialog} from './ExitDialog';
+import {FocusButton} from './FocusButton';
+import {SelectionDialog} from './SelectionDialog';
 
 const C = {bg: '#0B1018', panel: '#182230', text: '#F4F7FA', muted: '#96A6BB', accent: '#DCF763'};
 const message = (error: unknown) => error instanceof Error ? error.message : String(error);
@@ -20,18 +23,6 @@ function useReducedMotion() {
     return () => sub.remove();
   }, []);
   return reduced;
-}
-
-function FocusButton({label, onPress, primary = false, preferred = false, disabled = false, buttonRef, nextFocusLeft}: {
-  label: string; onPress: () => void; primary?: boolean; preferred?: boolean; disabled?: boolean;
-  buttonRef?: React.Ref<View>; nextFocusLeft?: number;
-}) {
-  const [focus, setFocus] = useState(false);
-  return <Pressable ref={buttonRef} nextFocusLeft={nextFocusLeft} accessibilityRole="button" accessibilityLabel={label} disabled={disabled}
-    hasTVPreferredFocus={preferred} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
-    onPress={onPress} style={[s.button, primary && s.primary, focus && s.buttonFocus, disabled && s.disabled]}>
-    <Text numberOfLines={1} style={[s.buttonText, (primary || focus) && s.darkText]}>{label}</Text>
-  </Pressable>;
 }
 
 function Poster({video, width, onPress, onFocus, preferred, progress, reduced, nextFocusUp, posterRef}: {
@@ -116,6 +107,7 @@ export default function App() {
   const [detailError, setDetailError] = useState('');
   const [notice, setNotice] = useState('');
   const [picker, setPicker] = useState<'source' | 'category' | 'line' | null>(null);
+  const [exitVisible, setExitVisible] = useState(false);
   const [reload, setReload] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const pages = useRef(new Map<string, {next: number; total: number}>());
@@ -229,7 +221,7 @@ export default function App() {
       if (picker) {setPicker(null); return true;}
       if (screen !== 'home') {home(); return true;}
       if (keyword) {setKeyword(''); setQuery(''); return true;}
-      Alert.alert('退出家庭影院？', '观看记录已保存在本机。', [{text: '取消', style: 'cancel'}, {text: '退出', onPress: () => BackHandler.exitApp()}]);
+      setExitVisible(true);
       return true;
     });
     return () => sub.remove();
@@ -254,6 +246,7 @@ export default function App() {
       : (detail?.lines || []).map((item, i) => ({id: String(i), name: `${item.name} · ${item.episodes.length} 集`}));
 
   return <View style={s.app}>
+    {exitVisible && <ExitDialog reduced={reduced} onDismiss={() => setExitVisible(false)} />}
     <TVFocusGuideView autoFocus style={[s.header, height < 600 && {height: 58}]}>
       <View style={s.brand}><Text style={s.brandIcon}>▶</Text><Text style={s.brandName}>Libre<Text style={s.accent}>TV</Text></Text><Text style={s.brandLabel}>家庭影院</Text></View>
       <View style={s.nav}>
@@ -332,18 +325,13 @@ export default function App() {
         : <View style={s.empty}><Text style={s.emptyTitle}>{detailError ? '详情加载失败' : '正在准备影片…'}</Text><Text style={s.emptyText}>{detailError}</Text>
           {!!detailError && detailVideo && <FocusButton label="重试" onPress={() => openDetail(detailVideo)} />}</View>}
     </Animated.View>}
-    <Modal visible={picker !== null} transparent animationType={reduced ? 'none' : 'fade'} onRequestClose={() => setPicker(null)}>
-      <View style={s.modalShade}><TVFocusGuideView autoFocus trapFocusUp trapFocusDown trapFocusLeft trapFocusRight style={s.modal}>
-        <Text style={s.sectionTitle}>{picker === 'source' ? '选择影视来源' : picker === 'category' ? '浏览分类' : '选择播放线路'}</Text>
-        <ScrollView style={s.pickerList}>{pickerRows.map((item, i) => <FocusButton key={item.id} label={item.name} preferred={i === 0} onPress={() => {
+    {picker && <SelectionDialog key={picker} reduced={reduced} options={pickerRows}
+      title={picker === 'source' ? '选择影视来源' : picker === 'category' ? '浏览分类' : '选择播放线路'}
+      onDismiss={() => setPicker(null)} onSelect={item => {
           if (picker === 'source') {setSource(sources.find(row => row.url === item.id)); setKeyword(''); setQuery('');}
           else if (picker === 'category') setCategory(item);
           else setLine(Number(item.id));
-          setPicker(null);
-        }} />)}{!pickerRows.length && <Text style={s.emptyText}>没有可用选项，请在影视源管理中启用来源。</Text>}</ScrollView>
-        <FocusButton label="关闭" preferred={!pickerRows.length} onPress={() => setPicker(null)} />
-      </TVFocusGuideView></View>
-    </Modal>
+      }} />}
   </View>;
 }
 
@@ -353,9 +341,6 @@ const s = StyleSheet.create({
   brand: {flexDirection: 'row', alignItems: 'center', gap: 10}, brandIcon: {color: C.accent, fontSize: 24},
   brandName: {color: C.text, fontSize: 26, fontWeight: '800', letterSpacing: -1}, brandLabel: {color: C.muted, fontSize: 12, marginLeft: 8},
   nav: {flexDirection: 'row', gap: 8}, accent: {color: C.accent},
-  button: {minHeight: 40, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, borderWidth: 2, borderColor: 'transparent', backgroundColor: C.panel, marginVertical: 3},
-  primary: {backgroundColor: C.accent}, buttonFocus: {borderColor: '#FFFFFF', backgroundColor: C.accent, elevation: 5},
-  buttonText: {color: C.text, fontSize: 14, fontWeight: '700', textAlign: 'center'}, darkText: {color: C.bg}, disabled: {opacity: 0.45},
   content: {flex: 1, paddingHorizontal: 32}, filters: {flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10},
   searchField: {flex: 1, height: 46, borderRadius: 10, borderWidth: 2, borderColor: '#33435B', backgroundColor: '#131D2B'},
   searchFocus: {borderColor: C.accent},
@@ -381,7 +366,5 @@ const s = StyleSheet.create({
   emptyText: {color: C.muted, fontSize: 13, lineHeight: 20, textAlign: 'center'}, footer: {alignItems: 'center', padding: 20, gap: 8},
   skeletonRow: {flexDirection: 'row', gap: 18}, skeleton: {backgroundColor: '#192738', borderRadius: 12},
   historyContent: {flex: 1, paddingHorizontal: 36, paddingTop: 22}, historyTitle: {fontSize: 30, fontWeight: '800', color: C.text, marginTop: 10},
-  episodeGrid: {paddingBottom: 20}, modalShade: {flex: 1, backgroundColor: '#000000B8', justifyContent: 'center', alignItems: 'center'},
-  modal: {width: 450, maxHeight: '80%', padding: 24, backgroundColor: C.panel, borderRadius: 18, gap: 12, borderWidth: 1, borderColor: '#445773'},
-  pickerList: {flexGrow: 0},
+  episodeGrid: {paddingBottom: 20},
 });

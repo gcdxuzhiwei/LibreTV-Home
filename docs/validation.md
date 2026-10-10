@@ -2,6 +2,15 @@
 
 以下 `dist` 路径表示验证时的本地产物，已由 `.gitignore` 排除。公开下载使用 GitHub Release 附件，发布步骤见 [发布说明](releasing.md)。历史校验文件可能同时包含 APK 和源码归档；当前构建脚本生成的校验文件仅包含 APK。
 
+## 1.2.1：统一弹窗与焦点按钮
+
+2026-10-10：版本更新为 1.2.1 / versionCode 15，同步 npm 项目版本、README 和更新日志；“关于”标题通过 `BuildConfig.VERSION_NAME` 自动显示应用版本。
+
+- 版本更新前，使用包含相同界面改动的 1.2.0 APK 在 Android TV API 30 模拟器验证退出框默认取消焦点、左右反复切换、取消与退出确认；来源、分类和线路选择器的单一高亮、方向键导航、分类长列表滚动、确认选择与关闭均通过。
+- `scripts/build.ps1` 的类型检查、`assembleDebug lintDebug` 通过，Lint 0 errors / 10 warnings；APK 元数据确认包名 `org.libretv.home`、1.2.1 / versionCode 15，固定签名校验通过。生成 `dist/LibreTV-Home-1.2.1.apk` 和 `dist/SHA256-1.2.1.txt`，SHA256 为 `e39e2591bfb69ce6abbd035883ecdcb22f64c6d1b41a7acabe4f7ee5f748f931`。
+- Android TV API 30 模拟器 `adb install -r` 覆盖安装成功，`dumpsys package` 确认安装版本为 1.2.1 / versionCode 15；本次版本递增后未重复进行完整界面与播放操作验证。`git diff --check` 通过。
+- 未验证实体电视或远端 GitHub Actions，未提交、推送或发布。
+
 ## 1.2.0：代码与文档清理
 
 2026-10-10：移除旧 Java 浏览页面，将原生影视源管理提取为 `SettingsActivity`。以下为本次清理后的验证；其余章节是对应旧版本的历史记录，不表示当前版本重新覆盖了全部场景。
