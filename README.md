@@ -4,7 +4,7 @@
 
 ## 安装
 
-从 [GitHub Releases](https://github.com/gcdxuzhiwei/LibreTV-Home/releases) 的版本附件（Assets）下载 APK；发布后即可在这里下载安装包。当前本地构建生成 `dist/LibreTV-Home-1.1.6.apk`，这是已签名的个人使用调试版，可直接侧载安装。`dist` 仅保存本地产物，不提交到源码仓库。从 1.1.6 起固定签名，后续可覆盖升级；此前 GitHub 版本的签名不同，需要卸载后重新安装一次。
+从 [GitHub Releases](https://github.com/gcdxuzhiwei/LibreTV-Home/releases) 的版本附件（Assets）下载 APK；发布后即可在这里下载安装包。当前本地构建生成 `dist/LibreTV-Home-1.1.7.apk`，这是已签名的个人使用调试版，可直接侧载安装。`dist` 仅保存本地产物，不提交到源码仓库。从 1.1.6 起固定签名，后续可覆盖升级；此前 GitHub 版本的签名不同，需要卸载后重新安装一次。
 
 1. 将 APK 复制到 U 盘，插入电视。
 2. 在电视设置中允许相应文件管理器安装未知来源应用；不同 MIUI TV 版本入口不同。

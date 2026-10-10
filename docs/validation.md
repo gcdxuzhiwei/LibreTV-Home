@@ -2,6 +2,10 @@
 
 以下 `dist` 路径表示验证时的本地产物，已由 `.gitignore` 排除。公开下载使用 GitHub Release 附件，发布步骤见 [发布说明](releasing.md)。历史校验文件可能同时包含 APK 和源码归档；当前构建脚本生成的校验文件仅包含 APK。
 
+## 1.1.7：版本更新
+
+2026-10-10：版本更新为 1.1.7 / versionCode 9，同步「关于」弹窗和安装说明。`scripts/build.ps1` 的 `assembleDebug lintDebug` 通过，Lint 0 错误、7 个警告；构建元数据确认版本为 1.1.7 / versionCode 9，APK 签名与固定证书一致。生成 `dist/LibreTV-Home-1.1.7.apk` 与 `dist/SHA256-1.1.7.txt`，`git diff --check` 通过。本次未进行设备安装或操作验证。
+
 ## 1.1.5：版本更新
 
 2026-10-09：版本更新为 1.1.5 / versionCode 7，同步「关于」弹窗和安装说明。`scripts/build.ps1` 的 `assembleDebug lintDebug` 通过，Lint 0 错误、7 个警告；构建元数据确认版本为 1.1.5 / versionCode 7。生成 `dist/LibreTV-Home-1.1.5.apk` 与 `dist/SHA256-1.1.5.txt`，`git diff --check` 通过。本次未重新安装或进行设备操作验证；播放器操作验证见下方沿用 1.1.4 版本号的修复构建记录。
