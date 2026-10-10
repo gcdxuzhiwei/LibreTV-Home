@@ -357,7 +357,7 @@ public final class MainActivity extends Activity {
         cancel(); screen="settings"; shell("影视源管理");
         TextView help=text("管理你的影视来源。启用的来源参与搜索，首页可单独选择浏览来源。",15,TvStyle.MUTED); body.addView(help);
         LinearLayout actions=row(); actions.setPadding(0,dp(14),0,dp(14)); actions.addView(button("返回首页",this::returnHome));
-        actions.addView(button("添加来源",this::addSource)); actions.addView(button("关于",() -> new AlertDialog.Builder(this).setTitle("LibreTV 家庭影院 1.1.10").setMessage("基于 LibreSpark/LibreTV 的苹果 CMS 协议，原生 Android TV 实现。\n\n无账号、无启动密码、无自建后端。数据与视频由第三方源直接提供，观看记录仅保存在本机。\n\n上游：https://github.com/LibreSpark/LibreTV\n许可：GNU AGPL-3.0，源码随项目提供。\n播放器：AndroidX Media3（Apache-2.0）。").setPositiveButton("关闭",null).show())); body.addView(actions);
+        actions.addView(button("添加来源",this::addSource)); actions.addView(button("关于",() -> new AlertDialog.Builder(this).setTitle("LibreTV 家庭影院 1.1.11").setMessage("基于 LibreSpark/LibreTV 的苹果 CMS 协议，原生 Android TV 实现。\n\n无账号、无启动密码、无自建后端。数据与视频由第三方源直接提供，观看记录仅保存在本机。\n\n上游：https://github.com/LibreSpark/LibreTV\n许可：GNU AGPL-3.0，源码随项目提供。\n播放器：AndroidX Media3（Apache-2.0）。").setPositiveButton("关闭",null).show())); body.addView(actions);
         ScrollView sc=new ScrollView(this); TvStyle.viewport(sc); LinearLayout list=new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL);
         for(Catalog.Source s : sources) {
             LinearLayout r=row(); CheckBox toggle=new CheckBox(this); toggle.setText(s.name); toggle.setTextSize(17); toggle.setTextColor(Color.WHITE); toggle.setChecked(s.enabled); toggle.setOnCheckedChangeListener((b,on) -> { s.enabled=on; store.saveSources(sources); }); r.addView(toggle,new LinearLayout.LayoutParams(0,dp(52),1));
