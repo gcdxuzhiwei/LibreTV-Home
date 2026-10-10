@@ -192,7 +192,7 @@ public final class MainActivity extends Activity {
         status.setText((keyword.isEmpty()?"正在浏览 " + selected.name:"正在搜索“"+keyword+"”")+" · 第 "+page+" 页");
         for (Catalog.Source s : targets) pending.add(workers.submit(() -> {
             Catalog.Page result=null; String error=null;
-            try { result=Catalog.page(s,requestedKeyword,requestedCategory,requestedPage); } catch (Exception e) { error=e.getMessage(); }
+            try { result=Catalog.page(s,requestedKeyword,requestedCategory,requestedPage); } catch (Exception e) { error=Network.describe(e); }
             Catalog.Page delivered=result; String message=error;
             runOnUiThread(() -> {
                 if (token != generation || !screen.equals("home") || isDestroyed()) return;
@@ -258,8 +258,19 @@ public final class MainActivity extends Activity {
                 BitmapFactory.Options options=new BitmapFactory.Options(); options.inSampleSize=1;
                 while (bounds.outWidth/options.inSampleSize>400 || bounds.outHeight/options.inSampleSize>600) options.inSampleSize*=2;
                 Bitmap b=BitmapFactory.decodeByteArray(bytes,0,bytes.length,options);
+                if (b==null) throw new Exception("图片解码失败：设备不支持此格式或服务器未返回有效图片");
                 if (b!=null && imageToken==imageGeneration && !Thread.currentThread().isInterrupted()) { covers.put(url,b); runOnUiThread(() -> { if (imageToken==imageGeneration && !isDestroyed() && image.isAttachedToWindow()) { image.setImageBitmap(b); TvStyle.reveal(image); } }); }
-            } catch (Exception ignored) { }
+            } catch (Exception e) {
+                if(imageToken!=imageGeneration || Thread.currentThread().isInterrupted() || e instanceof InterruptedException) return;
+                String reason=Network.describe(e);
+                android.util.Log.w("LibreTV", "海报加载失败："+reason);
+                runOnUiThread(() -> {
+                    if(imageToken==imageGeneration && !isDestroyed() && image.isAttachedToWindow()) {
+                        placeholder.setText(video.title()+"\n\n海报加载失败\n"+reason);
+                        placeholder.setTextSize(12);
+                    }
+                });
+            }
         }));
     }
     private void chooseSource() {
@@ -284,7 +295,7 @@ public final class MainActivity extends Activity {
         Button back=button("返回列表",this::returnHome); body.addView(back); back.requestFocusFromTouch();
         pending.add(workers.submit(() -> {
             try { Catalog.Video full=Catalog.detail(video); runOnUiThread(() -> { if (token==generation && screen.equals("detail")) { detail=full; lines=Catalog.lines(full); currentLine=0; JSONObject p=store.progress(full); for(int i=0;i<lines.size();i++) if(lines.get(i).name.equals(p.optString("line"))) currentLine=i; renderDetail(); } }); }
-            catch (Exception e) { runOnUiThread(() -> { if (token==generation) { body.addView(text("详情加载失败："+e.getMessage(),18,Color.LTGRAY)); body.addView(button("重试",() -> openDetail(video))); } }); }
+            catch (Exception e) { runOnUiThread(() -> { if (token==generation) { body.addView(text("详情加载失败："+Network.describe(e),18,Color.LTGRAY)); body.addView(button("重试",() -> openDetail(video))); } }); }
         }));
     }
     private void renderDetail() {
@@ -346,7 +357,7 @@ public final class MainActivity extends Activity {
         cancel(); screen="settings"; shell("影视源管理");
         TextView help=text("管理你的影视来源。启用的来源参与搜索，首页可单独选择浏览来源。",15,TvStyle.MUTED); body.addView(help);
         LinearLayout actions=row(); actions.setPadding(0,dp(14),0,dp(14)); actions.addView(button("返回首页",this::returnHome));
-        actions.addView(button("添加来源",this::addSource)); actions.addView(button("关于",() -> new AlertDialog.Builder(this).setTitle("LibreTV 家庭影院 1.1.8").setMessage("基于 LibreSpark/LibreTV 的苹果 CMS 协议，原生 Android TV 实现。\n\n无账号、无启动密码、无自建后端。数据与视频由第三方源直接提供，观看记录仅保存在本机。\n\n上游：https://github.com/LibreSpark/LibreTV\n许可：GNU AGPL-3.0，源码随项目提供。\n播放器：AndroidX Media3（Apache-2.0）。").setPositiveButton("关闭",null).show())); body.addView(actions);
+        actions.addView(button("添加来源",this::addSource)); actions.addView(button("关于",() -> new AlertDialog.Builder(this).setTitle("LibreTV 家庭影院 1.1.9").setMessage("基于 LibreSpark/LibreTV 的苹果 CMS 协议，原生 Android TV 实现。\n\n无账号、无启动密码、无自建后端。数据与视频由第三方源直接提供，观看记录仅保存在本机。\n\n上游：https://github.com/LibreSpark/LibreTV\n许可：GNU AGPL-3.0，源码随项目提供。\n播放器：AndroidX Media3（Apache-2.0）。").setPositiveButton("关闭",null).show())); body.addView(actions);
         ScrollView sc=new ScrollView(this); TvStyle.viewport(sc); LinearLayout list=new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL);
         for(Catalog.Source s : sources) {
             LinearLayout r=row(); CheckBox toggle=new CheckBox(this); toggle.setText(s.name); toggle.setTextSize(17); toggle.setTextColor(Color.WHITE); toggle.setChecked(s.enabled); toggle.setOnCheckedChangeListener((b,on) -> { s.enabled=on; store.saveSources(sources); }); r.addView(toggle,new LinearLayout.LayoutParams(0,dp(52),1));
@@ -356,7 +367,7 @@ public final class MainActivity extends Activity {
         sc.addView(list); body.addView(sc,new LinearLayout.LayoutParams(-1,0,1)); actions.getChildAt(0).requestFocusFromTouch();
     }
     private void probe(Catalog.Source s) {
-        toast("正在检测 "+s.name); workers.submit(() -> { String message; try { Catalog.Page p=Catalog.page(s,"","",1); message=s.name+" 可用，返回 "+p.videos.size()+" 部影视"; } catch(Exception e) { message=s.name+"："+e.getMessage(); } String result=message; runOnUiThread(() -> { if(!isDestroyed()) new AlertDialog.Builder(this).setTitle("来源检测").setMessage(result).setPositiveButton("确定",null).show(); }); });
+        toast("正在检测 "+s.name); workers.submit(() -> { String message; try { Catalog.Page p=Catalog.page(s,"","",1); message=s.name+" 可用，返回 "+p.videos.size()+" 部影视"; } catch(Exception e) { message=s.name+"："+Network.describe(e); } String result=message; runOnUiThread(() -> { if(!isDestroyed()) new AlertDialog.Builder(this).setTitle("来源检测").setMessage(result).setPositiveButton("确定",null).show(); }); });
     }
     private void addSource() {
         LinearLayout form=new LinearLayout(this); form.setOrientation(LinearLayout.VERTICAL); form.setPadding(dp(24),dp(12),dp(24),0);

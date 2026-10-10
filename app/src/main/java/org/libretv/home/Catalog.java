@@ -4,8 +4,9 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -58,14 +59,13 @@ public final class Catalog {
     }
     public static byte[] get(String address, int limit) throws Exception {
         if (!http(address)) throw new Exception("地址需要以 http:// 或 https:// 开头");
-        HttpURLConnection c = (HttpURLConnection) new URL(address).openConnection();
-        c.setConnectTimeout(8000); c.setReadTimeout(12000);
-        c.setRequestProperty("User-Agent", UA);
-        c.setRequestProperty("Accept", "*/*");
-        try {
-            int status = c.getResponseCode();
-            if (status < 200 || status >= 300) throw new Exception("HTTP " + status);
-            try (InputStream in = c.getInputStream(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+        Request request = new Request.Builder().url(address).header("User-Agent", UA).header("Accept", "*/*").build();
+        try (Response response = Network.CLIENT.newCall(request).execute()) {
+            if (!response.isSuccessful()) throw new Exception("HTTP " + response.code());
+            ResponseBody body = response.body();
+            if (body == null) throw new Exception("服务器返回空响应");
+            if (body.contentLength() > limit) throw new Exception("响应过大");
+            try (InputStream in = body.byteStream(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                 byte[] b = new byte[8192]; int n;
                 while ((n = in.read(b)) != -1) {
                     if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
@@ -74,7 +74,7 @@ public final class Catalog {
                 }
                 return out.toByteArray();
             }
-        } finally { c.disconnect(); }
+        }
     }
     private static JSONObject request(Source s, String... params) throws Exception {
         String base = s.url.split("#", 2)[0]; StringBuilder address = new StringBuilder(base);

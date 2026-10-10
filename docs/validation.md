@@ -2,6 +2,14 @@
 
 以下 `dist` 路径表示验证时的本地产物，已由 `.gitignore` 排除。公开下载使用 GitHub Release 附件，发布步骤见 [发布说明](releasing.md)。历史校验文件可能同时包含 APK 和源码归档；当前构建脚本生成的校验文件仅包含 APK。
 
+## 1.1.9：网络请求统一与电视错误诊断
+
+2026-10-10：`scripts/build.ps1` 的 `assembleDebug lintDebug` 通过，构建元数据确认 1.1.9 / versionCode 11，APK 签名校验与固定证书一致。生成 `dist/LibreTV-Home-1.1.9.apk` 和 `dist/SHA256-1.1.9.txt`。
+
+临时 JVM 验证程序调用实际 `Catalog.get` 和 `Network.describe`，通过本机 HTTP 服务验证重定向与 User-Agent、大小恰好等于上限、已知 Content-Length 和分块响应的超限拒绝、HTTP 404 提示；另外验证嵌套证书错误、TLS、DNS、超时分类及 URL 查询参数脱敏。10 项检查全部通过，临时程序已删除。`git diff --check` 通过。
+
+尚未在 Android 模拟器或小米电视安装此版本；以上验证不代表电视的 HTTPS 握手、图片解码或媒体播放已经恢复。OkHttp 仍使用设备的 TLS 和证书信任机制，本版没有跳过证书校验或加入新的 TLS Provider。
+
 ## 1.1.8：版本更新
 
 2026-10-10：版本更新为 1.1.8 / versionCode 10，同步「关于」弹窗和安装说明。`scripts/build.ps1` 的 `assembleDebug lintDebug` 通过，构建元数据确认版本为 1.1.8 / versionCode 10，APK 签名与固定证书一致。生成 `dist/LibreTV-Home-1.1.8.apk` 与 `dist/SHA256-1.1.8.txt`，`git diff --check` 通过。本次未进行设备安装或操作验证。

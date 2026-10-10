@@ -14,7 +14,7 @@ import android.widget.*;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
-import androidx.media3.datasource.DefaultHttpDataSource;
+import androidx.media3.datasource.okhttp.OkHttpDataSource;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
@@ -93,7 +93,7 @@ public final class PlayerActivity extends Activity {
         setContentView(root); updateTitle();
     }
     private void startPlayer() {
-        DefaultHttpDataSource.Factory http=new DefaultHttpDataSource.Factory().setUserAgent(Catalog.UA).setConnectTimeoutMs(10000).setReadTimeoutMs(20000).setAllowCrossProtocolRedirects(true);
+        OkHttpDataSource.Factory http=new OkHttpDataSource.Factory(Network.CLIENT).setUserAgent(Catalog.UA);
         player=new ExoPlayer.Builder(this).setRenderersFactory(new DefaultRenderersFactory(this).setEnableDecoderFallback(true))
             .setSeekBackIncrementMs(15000).setSeekForwardIncrementMs(15000)
             .setMediaSourceFactory(new DefaultMediaSourceFactory(http)).build();
@@ -107,7 +107,7 @@ public final class PlayerActivity extends Activity {
                 message.setText("播放失败，可重试或选择其他线路 / 来源"); message.setVisibility(View.VISIBLE); view.showController();
                 if(isFinishing() || errorDialog!=null) return;
                 errorDialog=new AlertDialog.Builder(PlayerActivity.this).setTitle("无法播放此视频")
-                    .setMessage("错误："+error.getErrorCodeName()+"\n可重试、切换线路，或返回详情搜索其他来源。")
+                    .setMessage("错误："+error.getErrorCodeName()+"\n"+Network.describe(error)+"\n设备：Android "+android.os.Build.VERSION.RELEASE+" / "+android.os.Build.MODEL+"\n可重试、切换线路，或返回详情搜索其他来源。")
                     .setPositiveButton("重试",(d,w) -> { player.prepare(); player.play(); })
                     .setNeutralButton("切换线路",(d,w) -> chooseLine()).setNegativeButton("关闭",null).create();
                 errorDialog.setOnDismissListener(d -> errorDialog=null); errorDialog.show();
