@@ -2,6 +2,14 @@
 
 以下 `dist` 路径表示验证时的本地产物，已由 `.gitignore` 排除。公开下载使用 GitHub Release 附件，发布步骤见 [发布说明](releasing.md)。历史校验文件可能同时包含 APK 和源码归档；当前构建脚本生成的校验文件仅包含 APK。
 
+## 1.2.3：弹窗动画与版本更新
+
+2026-10-12：将已合并到最新网络兼容与封面补全代码的弹窗动画纳入 1.2.3 / versionCode 17。同步 Android 与 npm 项目版本、README、更新日志及改造记录；“关于”标题通过 `BuildConfig.VERSION_NAME` 自动显示新版本。
+
+- `scripts/build.ps1` 的类型检查、`assembleDebug lintDebug` 与固定签名检查通过，Lint 0 errors / 11 warnings。APK 元数据确认包名 `org.libretv.home`、1.2.3 / versionCode 17；npm 项目与锁文件版本一致，`git diff --check` 通过。
+- 生成 `dist/LibreTV-Home-1.2.3.apk`（54,038,293 字节）与 `dist/SHA256-1.2.3.txt`，APK SHA256 为 `095ccf64af78e5a62c97fc9e59aec3f980be2d39bf27d188eabb697c88b37e3f`。
+- 本次无已连接的 ADB 设备，未重新安装或复测界面、播放与网络行为；此前弹窗与实机网络验证保留在下方历史记录。未提交、推送或发布。
+
 ## 小米 Android 6 实机网络排查与本地测试版
 
 2026-10-10：通过 ADB 在 MiTV4-ANSM0 / Android 6.0.1 / 已安装 1.2.1 上取得缺少信任根的播放错误。补充官方 ISRG Root X1，并让 React Native 图片请求继承统一网络客户端。实际兼容类与 OkHttp 4.12.0 生成独立 API 23 DEX 在电视执行：量子 HLS 与暴风 JPEG 从证书失败变为 HTTP 200，不受信任的自签名证书仍被拒绝。非凡、量子封面另有网络拦截；此前截图的 404 未复现。
@@ -9,6 +17,17 @@
 随后按用户授权准备本地构建工具，以独立临时密钥构建 1.2.1 测试版；类型检查、assembleDebug 与 lintDebug 通过（0 errors / 11 warnings），APK 签名及上传后的 SHA-256 校验通过。备份原 APK 和应用数据，卸载原应用，安装测试版并恢复观看记录与源设置。首页当前非凡资源多个封面正常显示，量子《超级夜总会》20220702 加载时长并持续播放，用户确认电视画面和声音正常。APK 为 `dist/LibreTV-Home-1.2.1-local-test.apk`；没有替换正式签名密钥或发布。详情见 [网络兼容记录](network-compatibility.md)。
 
 进一步按用户要求保持设备独立运行，新增封面失败后向其他已启用 CMS 精确匹配图片的设备端补全。电视 DEX 测试确认同名不同年份、类型、季数及资料缺失时不会误匹配，三个封面能直接下载。完整类型检查、assembleDebug 与 lintDebug 通过（0 errors / 11 warnings）。`dist/LibreTV-Home-1.2.1-coverfix-local-test.apk` 覆盖安装成功，截图确认量子首页与非凡第二页的各六张可见封面恢复；无需电脑或代理，播放来源保留。未重复验证视频播放或全部来源/影片。
+
+## 1.2.1：Motion 弹窗动画对齐
+
+2026-10-10：共享 React Native 弹窗按 [Motion 官方 modal 示例](https://motion.dev/examples/react-modal) 的公开运行参数调整，版本号保持 1.2.1 / versionCode 15。
+
+- 根据用户反馈将示例时长减半：进场延迟 100ms，动画 250ms，曲线 `[0.17, 0.67, 0.51, 1]`；进场透明度使用 `easeOut`。离场 150ms，曲线 `[0.67, 0.17, 0.62, 0.64]`，结束后再卸载；遮罩淡入淡出同步缩短为 150ms。
+- 初始及离场目标为 rotateX 5°、rotateY 25°、纵深 -100、透视距离 500、模糊 10；React Native 用等效透视与缩放表示纵深。遮罩黑色透明度 50%，背景快照模糊 3。原生三次盒式滤波近似高斯模糊，兼容 API 23；模糊图像与浏览器渲染可能存在细微差异，背景快照在弹窗期间保持静态。
+- `scripts/build.ps1` 的类型检查、`assembleDebug lintDebug` 与固定签名检查通过，Lint 0 errors / 10 warnings；产物仍为 `dist/LibreTV-Home-1.2.1.apk` 与对应 SHA256 文件，下节的旧哈希属于此前构建。
+- Android TV API 30 / 1280×720 模拟器覆盖安装成功。录屏检查打开、取消与返回关闭的中间帧；退出框默认取消焦点、重复打开关闭、窗口挂载后快速返回取消延迟动画、分类长列表高度与初始焦点正常。无 AndroidRuntime / ReactNativeJS 错误日志。录屏与截图保存在忽略的 `.tools/motion-dialog*` 文件中。
+- 时长减半后重新构建并覆盖安装，退出框打开与确认“取消”关闭复验通过，无运行错误日志；此前录屏保留原始时长，减半后的层级记录为 `.tools/motion-half-open.xml` 与 `.tools/motion-half-close.xml`。
+- 遵守系统减少动画设置；未验证实体电视、API 23 设备、全部同类弹窗入口或不同电视的实际帧率。未提交、推送或发布。
 
 ## 1.2.1：统一弹窗与焦点按钮
 

@@ -11,5 +11,7 @@ public final class LibreTvPackage implements ReactPackage {
     @Override public List<NativeModule> createNativeModules(ReactApplicationContext context) {
         return Collections.singletonList(new LibreTvModule(context));
     }
-    @Override public List<ViewManager> createViewManagers(ReactApplicationContext context) { return Collections.emptyList(); }
+    @Override public List<ViewManager> createViewManagers(ReactApplicationContext context) {
+        return Collections.singletonList(new DialogBlurManager());
+    }
 }
