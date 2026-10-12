@@ -1,7 +1,5 @@
 package org.libretv.home;
 
-import android.app.Activity;
-import android.app.AlertDialog;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
@@ -9,6 +7,7 @@ import android.os.Looper;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.*;
 import androidx.media3.common.MediaItem;
@@ -24,9 +23,15 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import com.facebook.react.ReactActivity;
+import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.ReactContext;
+import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.modules.core.DeviceEventManagerModule;
 
 @androidx.media3.common.util.UnstableApi
-public final class PlayerActivity extends Activity {
+public final class PlayerActivity extends ReactActivity {
+    @Override protected String getMainComponentName() { return "LibreTVPlayerDialogs"; }
     private Catalog.Video video;
     private List<Catalog.Line> lines;
     private LocalStore store;
@@ -40,7 +45,9 @@ public final class PlayerActivity extends Activity {
     private int shortcutKey=KeyEvent.KEYCODE_UNKNOWN;
     private long position;
     private boolean playWhenReady=true;
-    private AlertDialog errorDialog;
+    private Bundle dialog;
+    private int dialogId;
+    private View dialogFocus;
     private final Handler handler=new Handler(Looper.getMainLooper());
     private final Runnable checkpoint=new Runnable() { @Override public void run() { save(); handler.postDelayed(this,5000); } };
 
@@ -89,6 +96,10 @@ public final class PlayerActivity extends Activity {
         root.addView(toolbar,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
         message=new TextView(this); message.setTextColor(TvStyle.TEXT); message.setTextSize(17); message.setGravity(Gravity.CENTER); message.setPadding(dp(20),dp(12),dp(20),dp(12)); message.setBackgroundColor(0xDB1D1E24); message.setVisibility(View.GONE);
         root.addView(message,new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER));
+        // 使用同一 React Native 运行时承载播放器弹窗，生命周期由 ReactActivity 管理。
+        View reactRoot=getReactDelegate().getReactRootView();
+        if(reactRoot.getParent()!=null) ((ViewGroup)reactRoot.getParent()).removeView(reactRoot);
+        root.addView(reactRoot,new FrameLayout.LayoutParams(-1,-1));
         view.setControllerVisibilityListener((PlayerView.ControllerVisibilityListener) visibility -> TvStyle.showPanel(toolbar,visibility==View.VISIBLE));
         setContentView(root); updateTitle();
     }
@@ -105,12 +116,10 @@ public final class PlayerActivity extends Activity {
             }
             @Override public void onPlayerError(PlaybackException error) {
                 message.setText("播放失败，可重试或选择其他线路 / 来源"); message.setVisibility(View.VISIBLE); view.showController();
-                if(isFinishing() || errorDialog!=null) return;
-                errorDialog=new AlertDialog.Builder(PlayerActivity.this).setTitle("无法播放此视频")
-                    .setMessage("错误："+error.getErrorCodeName()+"\n"+Network.describe(error)+"\n设备：Android "+android.os.Build.VERSION.RELEASE+" / "+android.os.Build.MODEL+"\n可重试、切换线路，或返回详情搜索其他来源。")
-                    .setPositiveButton("重试",(d,w) -> { player.prepare(); player.play(); })
-                    .setNeutralButton("切换线路",(d,w) -> chooseLine()).setNegativeButton("关闭",null).create();
-                errorDialog.setOnDismissListener(d -> errorDialog=null); errorDialog.show();
+                if(isFinishing() || dialog!=null) return;
+                Bundle data=new Bundle(); data.putString("kind","error"); data.putString("title","无法播放此视频");
+                data.putString("message","错误："+error.getErrorCodeName()+"\n"+Network.describe(error)+"\n设备：Android "+android.os.Build.VERSION.RELEASE+" / "+android.os.Build.MODEL+"\n可重试、切换线路，或返回详情搜索其他来源。");
+                showDialog(data);
             }
         });
         prepare(); handler.postDelayed(checkpoint,5000);
@@ -130,18 +139,41 @@ public final class PlayerActivity extends Activity {
     }
     private void episodes() {
         String[] names=new String[lines.get(line).episodes.size()]; for(int i=0;i<names.length;i++) names[i]=lines.get(line).episodes.get(i).name;
-        new AlertDialog.Builder(this).setTitle("选集").setSingleChoiceItems(names,episode,(d,i) -> { d.dismiss(); switchEpisode(i); }).setNegativeButton("关闭",null).show();
+        Bundle data=new Bundle(); data.putString("kind","episodes"); data.putString("title","选集");
+        data.putStringArray("options",names); data.putInt("selected",episode); showDialog(data);
     }
     private void chooseLine() {
         String[] names=new String[lines.size()]; for(int i=0;i<names.length;i++) names[i]=lines.get(i).name;
-        new AlertDialog.Builder(this).setTitle("切换线路（保留当前进度）").setSingleChoiceItems(names,line,(d,i) -> {
-            if(player!=null) {
-                save(); String currentName=lines.get(line).episodes.get(episode).name; position=player.getCurrentPosition();
-                int target=-1; for(int k=0;k<lines.get(i).episodes.size();k++) if(lines.get(i).episodes.get(k).name.equals(currentName)) { target=k; break; }
-                if(target<0) { target=Math.min(episode,lines.get(i).episodes.size()-1); position=0; }
-                line=i; episode=target; playWhenReady=true; prepare();
-            } d.dismiss();
-        }).setNegativeButton("关闭",null).show();
+        Bundle data=new Bundle(); data.putString("kind","lines"); data.putString("title","切换线路（保留当前进度）");
+        data.putStringArray("options",names); data.putInt("selected",line); showDialog(data);
+    }
+    private void showDialog(Bundle data) {
+        if(dialog!=null || isFinishing()) return;
+        dialogFocus=getCurrentFocus(); shortcutKey=KeyEvent.KEYCODE_UNKNOWN;
+        data.putInt("id",++dialogId); dialog=data; emitDialog();
+    }
+    WritableMap playerDialog() { return dialog==null ? null : Arguments.fromBundle(dialog); }
+    private void emitDialog() {
+        ReactContext context=getReactInstanceManager().getCurrentReactContext();
+        if(context!=null) context.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
+            .emit("LibreTVPlayerDialog",playerDialog());
+    }
+    void playerDialogAction(int id,String action,int index) {
+        // 只接受当前弹窗的操作，快速重复确认或过期回调不能切换另一集。
+        if(dialog==null || dialog.getInt("id")!=id || isFinishing()) return;
+        String kind=dialog.getString("kind"); dialog=null; emitDialog();
+        if(dialogFocus!=null && dialogFocus.isShown() && dialogFocus.isEnabled()) dialogFocus.requestFocus();
+        else view.requestFocus();
+        dialogFocus=null;
+        if(player==null) return;
+        if("select".equals(action) && "episodes".equals(kind)) switchEpisode(index);
+        else if("select".equals(action) && "lines".equals(kind) && index>=0 && index<lines.size()) {
+            save(); String currentName=lines.get(line).episodes.get(episode).name; position=player.getCurrentPosition();
+            int target=-1; for(int k=0;k<lines.get(index).episodes.size();k++) if(lines.get(index).episodes.get(k).name.equals(currentName)) { target=k; break; }
+            if(target<0) { target=Math.min(episode,lines.get(index).episodes.size()-1); position=0; }
+            line=index; episode=target; playWhenReady=true; prepare();
+        } else if("retry".equals(action) && "error".equals(kind)) { player.prepare(); player.play(); }
+        else if("lines".equals(action) && "error".equals(kind)) chooseLine();
     }
     private void save() {
         if(player!=null && video!=null) {
@@ -158,6 +190,7 @@ public final class PlayerActivity extends Activity {
     }
     @Override protected void onSaveInstanceState(Bundle out) { save(); super.onSaveInstanceState(out); out.putInt("line",line); out.putInt("episode",episode); out.putLong("position",position); out.putBoolean("playing",playWhenReady); }
     @Override public boolean onKeyDown(int keyCode,KeyEvent event) {
+        if(dialog!=null) return super.onKeyDown(keyCode,event);
         if(player==null) return super.onKeyDown(keyCode,event);
         if(keyCode==KeyEvent.KEYCODE_MENU) { episodes(); return true; }
         if(keyCode==KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) { if(player.isPlaying()) player.pause(); else player.play(); return true; }
@@ -166,6 +199,7 @@ public final class PlayerActivity extends Activity {
         return super.onKeyDown(keyCode,event);
     }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        if(dialog!=null) return super.dispatchKeyEvent(event);
         int keyCode=event.getKeyCode();
         // 快捷键的抬起和长按重复事件也需消费，避免控制条显示后再次触发控件。
         if(shortcutKey!=KeyEvent.KEYCODE_UNKNOWN && keyCode==shortcutKey) {
@@ -200,6 +234,7 @@ public final class PlayerActivity extends Activity {
         return super.dispatchKeyEvent(event);
     }
     @Override public void onBackPressed() {
+        if(dialog!=null) { playerDialogAction(dialog.getInt("id"),"close",-1); return; }
         if(view!=null && view.isControllerFullyVisible()) {
             view.setControllerShowTimeoutMs(4500); view.hideController(); view.requestFocus();
         } else finish();

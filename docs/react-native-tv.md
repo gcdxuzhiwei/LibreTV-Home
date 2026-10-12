@@ -7,6 +7,7 @@
 - `Catalog`、`Network`、`LocalStore` 和 `PlayerActivity` 继续提供设备端请求、内容过滤、私有存储和原生 Media3 播放。
 - 影视源管理使用 React Native TV，添加、关于、检测、删除与清空记录复用 `Dialog` 和 `FocusButton`；保存后刷新启用来源及记录。
 - Launcher 为 `TvActivity`；影视源管理在 `SettingsScreen` 中呈现，旧 Java 页面已移除。
+- 播放器的选集、切换线路和播放错误弹窗由 `PlayerDialogs` 复用 `Dialog`、`FocusButton` 呈现；关闭按钮默认获得焦点，当前剧集和线路以勾选标识显示。Java 只提供数据与执行播放操作，不再创建 `AlertDialog`。
 
 ## 模拟器截图
 
@@ -18,7 +19,7 @@
 
 ## 版本与构建
 
-当前源码为 1.2.4 / versionCode 18，版本更新见 [更新日志](CHANGELOG.md#124)。1.2.1 统一弹窗与焦点按钮的本地验证见 [验证记录](validation.md#121统一弹窗与焦点按钮)。下方 1.2.0 版本与截图保留为改造时的历史记录。
+当前源码为 1.2.5 / versionCode 19，版本更新见 [更新日志](CHANGELOG.md#125)。1.2.5 的构建与版本校验见 [验证记录](validation.md#125播放器弹窗与版本更新)。1.2.1 统一弹窗与焦点按钮的本地验证见 [验证记录](validation.md#121统一弹窗与焦点按钮)。下方 1.2.0 版本与截图保留为改造时的历史记录。
 
 固定 React 18.3.1 / `react-native-tvos` 0.75.4-0，仍支持 API 23。使用旧架构 NativeModule 与 Hermes；不同时安装标准 React Native。`.npmrc` 的 `legacy-peer-deps` 避免 TV 虚拟列表的 peer dependency 再安装另一个标准或最新 TV 包。锁文件用于固定依赖。
 
@@ -44,6 +45,13 @@ npm run typecheck
 - 详情返回、弹窗返回、搜索返回、首页退出按层级处理。退出需要确认。
 - 播放资料继续使用私有 `playback.json` 传递，避免大选集超出 Intent 大小限制。
 - 观看记录、来源与进度继续使用既有本机存储；播放器返回后刷新进度。
+
+## 播放器弹窗组件验证（2026-10-12，版本递增前的 1.2.4 构建）
+
+- `npm run typecheck`、`git diff --check`、`assembleDebug lintDebug` 通过，Lint 为 0 errors / 11 warnings。
+- Android TV API 30 模拟器安装新 APK 后，从真实影片进入播放器；菜单键打开选集，默认焦点为“关闭”，遥控器切换第 5 集至第 4 集后再次打开，勾选标识更新正确。
+- 线路弹窗使用同一组件外观，默认焦点为“关闭”；返回关闭弹窗后仍处于 `PlayerActivity`，可继续操作播放控制条。
+- 当前抽样影片仅有一条线路，未验证跨线路保留进度；播放错误弹窗、实体电视和 API 23 设备尚未实测。
 
 ## 已知限制
 

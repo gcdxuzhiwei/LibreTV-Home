@@ -9,7 +9,9 @@
         android:usesCleartextTraffic="true" android:allowBackup="false" android:fullBackupContent="false"
         android:dataExtractionRules="@xml/data_extraction_rules" android:supportsRtl="true"
         android:enableOnBackInvokedCallback="true">
-        <activity android:name=".PlayerActivity" android:screenOrientation="landscape" android:exported="false" />
+        <activity android:name=".PlayerActivity" android:screenOrientation="landscape" android:exported="false"
+            android:theme="@style/ReactTVTheme"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode" />
         <activity android:name=".TvActivity" android:screenOrientation="landscape" android:exported="true"
             android:enableOnBackInvokedCallback="false"
             android:theme="@style/ReactTVTheme"

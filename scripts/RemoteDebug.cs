@@ -27,6 +27,8 @@ internal sealed class RemoteDebug : Form
 	private readonly List<Button> actions = new List<Button>();
 
 	private bool working;
+	private readonly Queue<Tuple<string, string>> pendingKeys = new Queue<Tuple<string, string>>();
+	private bool sendingKeys;
 
 	private static readonly Dictionary<string, int> Keys = new Dictionary<string, int>
 	{
@@ -83,12 +85,7 @@ internal sealed class RemoteDebug : Form
 				num = 226;
 				num2 = 300;
 			}
-			AddButton(name, num, num2, 94, 54, async delegate
-			{
-				string serial = SelectedDevice();
-				await Run(Adb, "-s " + Quote(serial) + " shell input keyevent " + Keys[name], 15000);
-				SetStatus("已发送：" + name + "  ·  " + serial);
-			});
+			AddButton(name, num, num2, 94, 54, () => SendKey(name), true);
 		}
 		AddButton("打开安卓模拟器", 20, 373, 150, 40, OpenEmulator);
 		AddButton("选择并安装 APK", 180, 373, 150, 40, InstallApk);
@@ -111,7 +108,7 @@ internal sealed class RemoteDebug : Form
 		});
 	}
 
-	private void AddButton(string text, int x, int y, int w, int h, Func<Task> action)
+	private void AddButton(string text, int x, int y, int w, int h, Func<Task> action, bool remoteKey = false)
 	{
 		Button button = new Button();
 		button.Text = text;
@@ -128,10 +125,41 @@ internal sealed class RemoteDebug : Form
 		}
 		button.Click += async delegate
 		{
-			await Execute(action);
+			if (remoteKey)
+			{
+				try { await action(); }
+				catch (Exception ex) { SetStatus("按键发送失败：" + ex.Message); }
+			}
+			else
+			{
+				await Execute(action);
+			}
 		};
-		actions.Add(button);
+		if (!remoteKey) actions.Add(button);
 		base.Controls.Add(button);
+	}
+
+	private async Task SendKey(string name)
+	{
+		// 点击时记录目标设备，连续按键按顺序发送，界面无需等待 ADB。
+		pendingKeys.Enqueue(Tuple.Create(SelectedDevice(), name));
+		if (sendingKeys) return;
+		sendingKeys = true;
+		try
+		{
+			while (pendingKeys.Count > 0 && !base.IsDisposed)
+			{
+				Tuple<string, string> key = pendingKeys.Dequeue();
+				await Run(Adb, "-s " + Quote(key.Item1) + " shell input keyevent " + Keys[key.Item2], 15000);
+				SetStatus("已发送：" + key.Item2 + "  ·  " + key.Item1);
+			}
+		}
+		finally
+		{
+			// 断连或窗口关闭时清除待发按键，避免恢复后执行过时操作。
+			pendingKeys.Clear();
+			sendingKeys = false;
+		}
 	}
 
 	private async Task Execute(Func<Task> action)

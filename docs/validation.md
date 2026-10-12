@@ -2,6 +2,15 @@
 
 以下 `dist` 路径表示验证时的本地产物，已由 `.gitignore` 排除。公开下载使用 GitHub Release 附件，发布步骤见 [发布说明](releasing.md)。历史校验文件可能同时包含 APK 和源码归档；当前构建脚本生成的校验文件仅包含 APK。
 
+## 1.2.5：播放器弹窗与版本更新
+
+2026-10-12：版本更新为 1.2.5 / versionCode 19，将当前播放器共享弹窗与遥控器连续按键改动纳入本地构建，同步 Android、npm 项目及锁文件、README、更新日志和改造记录。
+
+- `scripts/build.ps1` 类型检查、`assembleDebug lintDebug` 和固定签名校验通过，Lint 0 errors / 11 warnings。首次构建受沙箱本机 Gradle daemon 通信限制，允许本机通信后构建成功。
+- APK 元数据确认 `org.libretv.home`、1.2.5 / versionCode 19；npm 项目与锁文件版本一致，`git diff --check` 通过。
+- 生成 `dist/LibreTV-Home-1.2.5.apk`（54,044,145 字节）与 `dist/SHA256-1.2.5.txt`，校验文件与实际 APK SHA256 一致：`7643790f8b1c92364ef2bc4937759865202dafde7af67d18f51ede58e0cc2b3e`。
+- 本次未安装或复测设备界面、播放和网络行为；版本递增前的播放器模拟器抽样验证见 [改造记录](react-native-tv.md)。未提交、推送或发布。
+
 ## 1.2.4：来源复选框组件
 
 2026-10-12：来源启用控件改用独立 `FocusCheckbox`，保留透明行背景与来源文字。参考 [Motion Base UI Checkbox](https://motion.dev/examples/react-base-checkbox) 的勾线路径动画，使用 React Native Animated 实现两段线依次绘制与收回、按压和焦点缩放；减少动画模式直接切换状态。

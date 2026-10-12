@@ -152,6 +152,19 @@ public final class LibreTvModule extends ReactContextBaseJavaModule {
     @ReactMethod public void clearHistory(Promise promise) {
         store.clearHistory(); promise.resolve(null);
     }
+    // 订阅后读取快照，避免 React 根视图挂载前的播放器错误事件丢失。
+    @ReactMethod public void playerDialog(Promise promise) {
+        getReactApplicationContext().runOnUiQueueThread(() -> {
+            Activity activity=getCurrentActivity();
+            promise.resolve(activity instanceof PlayerActivity ? ((PlayerActivity)activity).playerDialog() : null);
+        });
+    }
+    @ReactMethod public void playerDialogAction(int id,String action,int index) {
+        getReactApplicationContext().runOnUiQueueThread(() -> {
+            Activity activity=getCurrentActivity();
+            if(activity instanceof PlayerActivity) ((PlayerActivity)activity).playerDialogAction(id,action,index);
+        });
+    }
     @ReactMethod public void play(String json, int line, int episode, boolean resume, Promise promise) {
         // 文件写入和 Activity 启动在同一 UI 任务中串行执行，防止两次播放互相覆盖。
         getReactApplicationContext().runOnUiQueueThread(() -> {

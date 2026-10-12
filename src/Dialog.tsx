@@ -14,8 +14,8 @@ const depthScales = depthSteps.map(progress => 500 / (600 - 100 * progress));
 export type DialogHandle = {close: (afterClose?: () => void) => void};
 
 export const Dialog = forwardRef<DialogHandle, {
-  reduced: boolean; onDismiss: () => void; initialFocus: React.RefObject<View>; children: React.ReactNode;
-}>(function Dialog({reduced, onDismiss, initialFocus, children}, ref) {
+  reduced: boolean; onDismiss: () => void; onCloseStart?: () => void; initialFocus: React.RefObject<View>; children: React.ReactNode;
+}>(function Dialog({reduced, onDismiss, onCloseStart, initialFocus, children}, ref) {
   const {width} = useWindowDimensions();
   const closing = useRef(false);
   const animation = useRef<Animated.CompositeAnimation | null>(null);
@@ -45,6 +45,7 @@ export const Dialog = forwardRef<DialogHandle, {
   const close = (afterClose?: () => void) => {
     if (closing.current) return;
     closing.current = true;
+    onCloseStart?.();
     // 取消完整序列，包含还未开始的 100ms 延迟，防止快速返回后再次进场。
     animation.current?.stop();
     overlay.stopAnimation(); content.stopAnimation(); opacity.stopAnimation(); blur.stopAnimation();
