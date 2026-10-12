@@ -4,7 +4,7 @@
 
 - 首页、跨来源搜索、来源与分类选择、分页、详情、播放线路、选集和观看记录改为 React Native TV。
 - 以大海报背景、深色面板、青柠色焦点和卡片弹性缩放实现家庭影院视觉；遵守系统减少动画设置。
-- `Catalog`、`Network`、`LocalStore` 和 `PlayerActivity` 继续提供设备端请求、内容过滤、私有存储和原生 Media3 播放。
+- `src/catalog.ts` 提供 CMS 参数拼接、JSON 解析、内容过滤、叶子分类、直连线路解析和封面补全；`Network`、`LocalStore` 和 `PlayerActivity` 提供设备端请求、私有存储和原生 Media3 播放。
 - 影视源管理使用 React Native TV，添加、关于、检测、删除与清空记录复用 `Dialog` 和 `FocusButton`；保存后刷新启用来源及记录。
 - Launcher 为 `TvActivity`；影视源管理在 `SettingsScreen` 中呈现，旧 Java 页面已移除。
 - 播放器的选集、切换线路和播放错误弹窗由 `PlayerDialogs` 复用 `Dialog`、`FocusButton` 呈现；关闭按钮默认获得焦点，当前剧集和线路以勾选标识显示。Java 只提供数据与执行播放操作，不再创建 `AlertDialog`。
@@ -19,7 +19,7 @@
 
 ## 版本与构建
 
-当前源码为 1.2.5 / versionCode 19，版本更新见 [更新日志](CHANGELOG.md#125)。1.2.5 的构建与版本校验见 [验证记录](validation.md#125播放器弹窗与版本更新)。1.2.1 统一弹窗与焦点按钮的本地验证见 [验证记录](validation.md#121统一弹窗与焦点按钮)。下方 1.2.0 版本与截图保留为改造时的历史记录。
+当前源码为 1.2.6 / versionCode 20，版本更新见 [更新日志](CHANGELOG.md#126)。1.2.6 的构建与版本校验见 [验证记录](validation.md#126cms-业务迁移与版本更新)。1.2.1 统一弹窗与焦点按钮的本地验证见 [验证记录](validation.md#121统一弹窗与焦点按钮)。下方 1.2.0 版本与截图保留为改造时的历史记录。
 
 固定 React 18.3.1 / `react-native-tvos` 0.75.4-0，仍支持 API 23。使用旧架构 NativeModule 与 Hermes；不同时安装标准 React Native。`.npmrc` 的 `legacy-peer-deps` 避免 TV 虚拟列表的 peer dependency 再安装另一个标准或最新 TV 包。锁文件用于固定依赖。
 
@@ -39,11 +39,11 @@ npm run typecheck
 
 ## 数据与焦点
 
-- CMS 网络调用在 Java 工作线程执行；页面通过请求代数忽略切换条件后的过期响应。
+- CMS 网络读取在 Java 工作线程执行，使用既有 OkHttp、兼容证书、超时与 8 MiB 响应上限；响应在 TS 中解析。页面通过请求代数忽略过期响应，取消操作同时停止 TS 后续查询及原生排队、运行中的请求；封面查询继续使用独立受限队列。
 - 每个来源分别保存页码，失败来源保留页码可重试，成功来源前进并按来源 URL / 影片 ID 去重。
 - 焦点通过 `TVFocusGuideView` 和 `Pressable` 管理；弹窗限制焦点范围，列表保留挂载的卡片并在焦点移动时滚动。
 - 详情返回、弹窗返回、搜索返回、首页退出按层级处理。退出需要确认。
-- 播放资料继续使用私有 `playback.json` 传递，避免大选集超出 Intent 大小限制。
+- 播放资料继续使用私有 `playback.json` 传递，避免大选集超出 Intent 大小限制；TS 将已解析的 `playbackLines` 写入同一资料，详情与原生播放共用线路及剧集顺序。观看记录仍保存原有影片结构。
 - 观看记录、来源与进度继续使用既有本机存储；播放器返回后刷新进度。
 
 ## 播放器弹窗组件验证（2026-10-12，版本递增前的 1.2.4 构建）

@@ -15,7 +15,7 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** 复用设备端 CMS 与私有存储，JS 只负责页面和焦点交互。 */
+/** 提供可取消的设备网络请求、私有存储与原生播放；CMS 业务在 TS 中处理。 */
 @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public final class LibreTvModule extends ReactContextBaseJavaModule {
     private final ThreadPoolExecutor workers = (ThreadPoolExecutor) Executors.newFixedThreadPool(4);
@@ -104,13 +104,11 @@ public final class LibreTvModule extends ReactContextBaseJavaModule {
             return null;
         });
     }
-    @ReactMethod public void probeSource(String json, Promise promise) {
-        request("probe", promise, () -> new JSONObject().put("count", Catalog.page(source(json), "", "", 1).videos.size()).toString());
-    }
-    @ReactMethod public void coverCandidates(String json, String requestId, Promise promise) {
+    @ReactMethod public void fetchCms(String address, String group, Promise promise) {
+        Request task = () -> new String(Catalog.get(address, 8 * 1024 * 1024), StandardCharsets.UTF_8);
+        if (!group.startsWith("cover:")) { request(group, promise, task); return; }
         synchronized (pending) {
-            PendingRequest item = new PendingRequest("cover:" + requestId, promise, () ->
-                    CoverFallback.candidates(Catalog.Video.from(new JSONObject(json)), store.sources()));
+            PendingRequest item = new PendingRequest(group, promise, task);
             pending.add(item);
             try {
                 coverWorkers.execute(item.future);
@@ -120,33 +118,6 @@ public final class LibreTvModule extends ReactContextBaseJavaModule {
                     promise.reject("COVER_BUSY", "封面补全队列繁忙，请稍后重试", error);
             }
         }
-    }
-    @ReactMethod public void page(String json, String keyword, String category, int number, Promise promise) {
-        request("page", promise, () -> {
-            Catalog.Page page = Catalog.page(source(json), keyword, category, Math.max(1, number));
-            JSONArray videos = new JSONArray();
-            for (Catalog.Video video : page.videos) videos.put(video.json());
-            return new JSONObject().put("videos", videos).put("pages", page.pages).toString();
-        });
-    }
-    @ReactMethod public void categories(String json, Promise promise) {
-        request("categories", promise, () -> {
-            JSONArray rows = new JSONArray();
-            for (String[] row : Catalog.categories(source(json))) rows.put(new JSONObject().put("id", row[0]).put("name", row[1]));
-            return rows.toString();
-        });
-    }
-    @ReactMethod public void detail(String json, Promise promise) {
-        request("detail", promise, () -> {
-            Catalog.Video video = Catalog.detail(Catalog.Video.from(new JSONObject(json)));
-            JSONArray lines = new JSONArray();
-            for (Catalog.Line line : Catalog.lines(video)) {
-                JSONArray episodes = new JSONArray();
-                for (Catalog.Episode episode : line.episodes) episodes.put(episode.name);
-                lines.put(new JSONObject().put("name", line.name).put("episodes", episodes));
-            }
-            return new JSONObject().put("video", video.json()).put("lines", lines).put("progress", store.progress(video)).toString();
-        });
     }
     @ReactMethod public void history(Promise promise) { request(promise, () -> store.history().toString()); }
     @ReactMethod public void clearHistory(Promise promise) {
@@ -171,11 +142,11 @@ public final class LibreTvModule extends ReactContextBaseJavaModule {
             try {
                 Activity activity = getCurrentActivity();
                 if (activity == null || activity.isFinishing()) throw new Exception("页面已关闭");
-                Catalog.Video video = Catalog.Video.from(new JSONObject(json));
-                List<Catalog.Line> lines = Catalog.lines(video);
+                JSONObject payload = new JSONObject(json);
+                List<Catalog.Line> lines = Catalog.playbackLines(payload.getJSONArray("playbackLines"));
                 if (line < 0 || line >= lines.size() || episode < 0 || episode >= lines.get(line).episodes.size()) throw new Exception("选集不存在");
                 try (FileOutputStream out = activity.openFileOutput("playback.json", Context.MODE_PRIVATE)) {
-                    out.write(video.json().toString().getBytes(StandardCharsets.UTF_8));
+                    out.write(payload.toString().getBytes(StandardCharsets.UTF_8));
                 }
                 activity.startActivity(new Intent(activity, PlayerActivity.class).putExtra("line", line).putExtra("episode", episode).putExtra("resume", resume));
                 promise.resolve(null);

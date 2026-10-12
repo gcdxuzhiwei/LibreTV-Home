@@ -2,6 +2,23 @@
 
 以下 `dist` 路径表示验证时的本地产物，已由 `.gitignore` 排除。公开下载使用 GitHub Release 附件，发布步骤见 [发布说明](releasing.md)。历史校验文件可能同时包含 APK 和源码归档；当前构建脚本生成的校验文件仅包含 APK。
 
+## 1.2.6：CMS 业务迁移与版本更新
+
+2026-10-12：版本更新为 1.2.6 / versionCode 20，将下方 CMS TypeScript 迁移纳入本地构建，同步 Android、npm 项目及锁文件、README、更新日志和改造记录。
+
+- `scripts/build.ps1` 类型检查、`assembleDebug lintDebug` 和固定签名校验通过，Lint 0 errors / 11 warnings。
+- APK 元数据确认 `org.libretv.home`、1.2.6 / versionCode 20，npm 项目与锁文件版本一致，`git diff --check` 通过。
+- 生成 `dist/LibreTV-Home-1.2.6.apk`（54,044,976 字节）与 `dist/SHA256-1.2.6.txt`，校验文件与实际 APK SHA256 一致：`83599bdda6f5be2340016082489d2587d3dabe1adeca8647f3cac1ba13008320`。
+- 本次未安装或复测设备界面、播放、切集和续播；未提交、推送或发布。
+
+### 版本递增前的 CMS 迁移验证
+
+2026-10-12：CMS 参数拼接、响应解析、分类过滤、直连线路与封面补全规则迁移到 `src/catalog.ts`。原生模块精简为 `fetchCms` 请求桥接，移除 `CoverFallback.java`；播放器读取 TS 已解析的线路，来源与观看记录继续使用原有存储。此次没有递增版本或更新 `dist` 发布产物。
+
+- `npm run typecheck`、`git diff --check`、`assembleDebug lintDebug` 通过，Lint 0 errors / 11 warnings；Android 构建包含 Metro 打包和 Hermes 字节码编译。首次 Gradle daemon 连接受沙箱限制，允许本机通信后构建成功。
+- 使用内存中的 Node 验证脚本检查 CMS 参数编码、分页与内容过滤、叶子分类、直连线路顺序及带查询参数的媒体地址、同片匹配、BOM 响应、来源失败，以及 HTTP 等待中和来源读取中两种取消时序；全部通过，未新增测试文件。
+- 本机 ADB 没有已连接设备，本次未安装验证页面、播放、切集和续播；实体电视及 API 23 行为仍需实测。构建 APK 在 `app/build/outputs/apk/debug/app-debug.apk`。
+
 ## 1.2.5：播放器弹窗与版本更新
 
 2026-10-12：版本更新为 1.2.5 / versionCode 19，将当前播放器共享弹窗与遥控器连续按键改动纳入本地构建，同步 Android、npm 项目及锁文件、README、更新日志和改造记录。

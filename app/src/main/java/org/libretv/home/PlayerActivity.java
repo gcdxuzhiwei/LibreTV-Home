@@ -62,9 +62,11 @@ public final class PlayerActivity extends ReactActivity {
         try {
             try(InputStream in=openFileInput("playback.json"); ByteArrayOutputStream out=new ByteArrayOutputStream()) {
                 byte[] buffer=new byte[8192]; int n; while((n=in.read(buffer))!=-1) out.write(buffer,0,n);
-                video=Catalog.Video.from(new JSONObject(out.toString(StandardCharsets.UTF_8.name())));
+                JSONObject payload=new JSONObject(out.toString(StandardCharsets.UTF_8.name()));
+                video=Catalog.Video.from(payload);
+                lines=Catalog.playbackLines(payload.getJSONArray("playbackLines"));
             }
-            lines=Catalog.lines(video); if(lines.isEmpty()) throw new Exception("没有可播放线路");
+            if(lines.isEmpty()) throw new Exception("没有可播放线路");
             line=Math.max(0,Math.min(getIntent().getIntExtra("line",0),lines.size()-1));
             episode=Math.max(0,Math.min(getIntent().getIntExtra("episode",0),lines.get(line).episodes.size()-1));
             JSONObject progress=store.progress(video);
