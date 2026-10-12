@@ -17,8 +17,8 @@ android {
         applicationId 'org.libretv.home'
         minSdk 23
         targetSdk 35
-        versionCode 17
-        versionName '1.2.3'
+        versionCode 18
+        versionName '1.2.4'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     packaging { jniLibs { useLegacyPackaging = true } }

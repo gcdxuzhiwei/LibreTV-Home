@@ -26,6 +26,9 @@ public final class LibreTvModule extends ReactContextBaseJavaModule {
     private final LocalStore store;
     LibreTvModule(ReactApplicationContext context) { super(context); store = new LocalStore(context); }
     @Override public String getName() { return "LibreTV"; }
+    @Override public java.util.Map<String, Object> getConstants() {
+        return java.util.Collections.singletonMap("version", BuildConfig.VERSION_NAME);
+    }
     private interface Request { String run() throws Exception; }
     private void request(Promise promise, Request task) {
         // 本地记录读取不排在网络任务后面。
@@ -84,6 +87,25 @@ public final class LibreTvModule extends ReactContextBaseJavaModule {
             for (Catalog.Source item : store.sources()) rows.put(item.json());
             return rows.toString();
         });
+    }
+    @ReactMethod public void saveSources(String json, Promise promise) {
+        request(promise, () -> {
+            JSONArray rows = new JSONArray(json);
+            List<Catalog.Source> sources = new ArrayList<>();
+            java.util.Set<String> urls = new java.util.HashSet<>();
+            for (int i = 0; i < rows.length(); i++) {
+                Catalog.Source row = source(rows.getJSONObject(i).toString());
+                Catalog.Source item = new Catalog.Source(row.name.trim(), row.url.trim(), row.enabled);
+                if (item.name.isEmpty() || !Catalog.http(item.url)) throw new Exception("填写名称和有效的 http(s) 接口地址");
+                if (!urls.add(item.url)) throw new Exception("该地址已存在");
+                sources.add(item);
+            }
+            store.saveSources(sources);
+            return null;
+        });
+    }
+    @ReactMethod public void probeSource(String json, Promise promise) {
+        request("probe", promise, () -> new JSONObject().put("count", Catalog.page(source(json), "", "", 1).videos.size()).toString());
     }
     @ReactMethod public void coverCandidates(String json, String requestId, Promise promise) {
         synchronized (pending) {
@@ -145,12 +167,6 @@ public final class LibreTvModule extends ReactContextBaseJavaModule {
                 activity.startActivity(new Intent(activity, PlayerActivity.class).putExtra("line", line).putExtra("episode", episode).putExtra("resume", resume));
                 promise.resolve(null);
             } catch (Exception error) { promise.reject("PLAY_ERROR", Network.describe(error), error); }
-        });
-    }
-    @ReactMethod public void openSettings() {
-        getReactApplicationContext().runOnUiQueueThread(() -> {
-            Activity activity = getCurrentActivity();
-            if (activity != null) activity.startActivity(new Intent(activity, SettingsActivity.class));
         });
     }
     @Override public void invalidate() {

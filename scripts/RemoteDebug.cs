@@ -267,7 +267,8 @@ internal sealed class RemoteDebug : Form
 		}
 		ProcessStartInfo info = StartInfo(Emulator, "-avd " + Quote(avd) + " -gpu swiftshader -no-snapshot-load");
 		info.WindowStyle = ProcessWindowStyle.Normal;
-		info.CreateNoWindow = false;
+		// 模拟器保留图形窗口，控制台进程不创建终端窗口。
+		info.CreateNoWindow = true;
 		info.StandardOutputEncoding = null;
 		info.StandardErrorEncoding = null;
 		info.RedirectStandardOutput = false;

@@ -5,8 +5,8 @@
 - 首页、跨来源搜索、来源与分类选择、分页、详情、播放线路、选集和观看记录改为 React Native TV。
 - 以大海报背景、深色面板、青柠色焦点和卡片弹性缩放实现家庭影院视觉；遵守系统减少动画设置。
 - `Catalog`、`Network`、`LocalStore` 和 `PlayerActivity` 继续提供设备端请求、内容过滤、私有存储和原生 Media3 播放。
-- 设置按钮进入已有原生影视源管理，返回时重新读取启用来源及记录。
-- Launcher 为 `TvActivity`；影视源管理提取为 `SettingsActivity`，旧 Java 首页、搜索、详情与观看记录页面已移除。
+- 影视源管理使用 React Native TV，添加、关于、检测、删除与清空记录复用 `Dialog` 和 `FocusButton`；保存后刷新启用来源及记录。
+- Launcher 为 `TvActivity`；影视源管理在 `SettingsScreen` 中呈现，旧 Java 页面已移除。
 
 ## 模拟器截图
 
@@ -18,7 +18,7 @@
 
 ## 版本与构建
 
-当前源码为 1.2.3 / versionCode 17，版本更新见 [更新日志](CHANGELOG.md#123)。1.2.1 统一弹窗与焦点按钮的本地验证见 [验证记录](validation.md#121统一弹窗与焦点按钮)。下方 1.2.0 版本与截图保留为改造时的历史记录。
+当前源码为 1.2.4 / versionCode 18，版本更新见 [更新日志](CHANGELOG.md#124)。1.2.1 统一弹窗与焦点按钮的本地验证见 [验证记录](validation.md#121统一弹窗与焦点按钮)。下方 1.2.0 版本与截图保留为改造时的历史记录。
 
 固定 React 18.3.1 / `react-native-tvos` 0.75.4-0，仍支持 API 23。使用旧架构 NativeModule 与 Hermes；不同时安装标准 React Native。`.npmrc` 的 `legacy-peer-deps` 避免 TV 虚拟列表的 peer dependency 再安装另一个标准或最新 TV 包。锁文件用于固定依赖。
 

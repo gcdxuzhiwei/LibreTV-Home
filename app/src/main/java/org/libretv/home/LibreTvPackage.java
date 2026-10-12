@@ -5,6 +5,7 @@ import com.facebook.react.bridge.NativeModule;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.uimanager.ViewManager;
 import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
 
 public final class LibreTvPackage implements ReactPackage {
@@ -12,6 +13,6 @@ public final class LibreTvPackage implements ReactPackage {
         return Collections.singletonList(new LibreTvModule(context));
     }
     @Override public List<ViewManager> createViewManagers(ReactApplicationContext context) {
-        return Collections.singletonList(new DialogBlurManager());
+        return Arrays.asList(new DialogBlurManager(), new FocusGridManager());
     }
 }

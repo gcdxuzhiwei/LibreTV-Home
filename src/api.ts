@@ -14,6 +14,10 @@ export const titleOf = (video: Video) => String(video.vod.vod_name || '未命名
 export const api = {
   cancelRequests: (group: 'page' | 'categories' | 'detail') => native.cancelRequests(group),
   sources: () => json<Source[]>(native.sources()),
+  saveSources: (sources: Source[]): Promise<void> => native.saveSources(JSON.stringify(sources)),
+  probeSource: (source: Source) => json<{count: number}>(native.probeSource(JSON.stringify(source))),
+  cancelProbe: () => native.cancelRequests('probe'),
+  version: String(native.version),
   coverCandidates: (video: Video, requestId: string) => json<string[]>(native.coverCandidates(JSON.stringify(video), requestId)),
   cancelCoverRequest: (requestId: string) => native.cancelRequests(`cover:${requestId}`),
   page: (source: Source, keyword: string, category: string, page: number) =>
@@ -24,5 +28,4 @@ export const api = {
   clearHistory: (): Promise<void> => native.clearHistory(),
   play: (video: Video, line: number, episode: number, resume: boolean): Promise<void> =>
     native.play(JSON.stringify(video), line, episode, resume),
-  openSettings: () => native.openSettings(),
 };

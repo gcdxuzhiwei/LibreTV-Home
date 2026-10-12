@@ -1,13 +1,16 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState} from 'react';
 import {
-  AccessibilityInfo, Alert, Animated, AppState, BackHandler, FlatList,
+  AccessibilityInfo, Animated, AppState, BackHandler, FlatList,
   Pressable, StyleSheet, Text, TextInput, TVFocusGuideView,
   findNodeHandle, useWindowDimensions, View,
 } from 'react-native';
 import {api, Category, Detail, History, keyOf, Source, titleOf, Video} from './api';
 import {ExitDialog} from './ExitDialog';
 import {FocusButton} from './FocusButton';
+import {FocusGrid} from './FocusGrid';
 import {SelectionDialog} from './SelectionDialog';
+import {DialogMessage, MessageDialog} from './MessageDialog';
+import {SettingsScreen} from './SettingsScreen';
 import {CoverImage, CoverSourcesContext} from './CoverImage';
 
 const C = {bg: '#0B1018', panel: '#182230', text: '#F4F7FA', muted: '#96A6BB', accent: '#DCF763'};
@@ -25,11 +28,12 @@ function useReducedMotion() {
   return reduced;
 }
 
-function Poster({video, width, onPress, onFocus, preferred, progress, reduced, nextFocusUp, posterRef}: {
+function Poster({video, width, onPress, onFocus, preferred, progress, reduced, nextFocusUp, posterRef, index}: {
   video: Video; width: number; onPress: () => void; onFocus: () => void; preferred?: boolean;
   progress?: History; reduced: boolean;
   nextFocusUp?: number;
   posterRef?: React.Ref<View>;
+  index: number;
 }) {
   const [focused, setFocused] = useState(false);
   const scale = useRef(new Animated.Value(1)).current;
@@ -40,7 +44,7 @@ function Poster({video, width, onPress, onFocus, preferred, progress, reduced, n
     else Animated.spring(scale, {toValue: active ? 1.035 : 1, useNativeDriver: true, friction: 9}).start();
   };
   const percent = progress?.duration ? Math.min(100, 100 * (progress.position || 0) / progress.duration) : 0;
-  return <Pressable ref={posterRef} accessibilityRole="button" accessibilityLabel={`${titleOf(video)}，${video.source.name}`}
+  return <Pressable ref={posterRef} nativeID={`grid-item-${index}`} accessibilityRole="button" accessibilityLabel={`${titleOf(video)}，${video.source.name}`}
     nextFocusUp={nextFocusUp}
     hasTVPreferredFocus={preferred} onPress={onPress} onFocus={() => {animate(true); onFocus();}}
     onBlur={() => animate(false)} style={{width, margin: 9}}>
@@ -71,11 +75,25 @@ function Hero({video, detail = false, children}: {video?: Video; detail?: boolea
   </View>;
 }
 
+type PreviewHandle = {update: (video: Video | undefined, immediate?: boolean) => void};
+const HeroPreview = forwardRef<PreviewHandle, {initial?: Video}>(function HeroPreview({initial}, ref) {
+  const [video, setVideo] = useState(initial);
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  useImperativeHandle(ref, () => ({update: (next, immediate = false) => {
+    clearTimeout(timer.current);
+    if (immediate) setVideo(next);
+    else timer.current = setTimeout(() => setVideo(next), 150);
+  }}), []);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return <Hero video={video} />;
+});
+
 export default function App() {
   const {width, height} = useWindowDimensions();
   const reduced = useReducedMotion();
   const columns = Math.max(3, Math.min(7, Math.floor((width - 64) / (height < 600 ? 140 : 150))));
   const posterWidth = (width - 82) / columns - 18;
+  const rowHeight = posterWidth * 1.38 + 64;
   const [sources, setSources] = useState<Source[]>([]);
   const coverSources = useMemo(() => JSON.stringify(sources.filter(item => item.enabled).map(item => item.url)), [sources]);
   const [source, setSource] = useState<Source>();
@@ -96,12 +114,21 @@ export default function App() {
     for (let index = 0; index < videos.length; index += columns) rows.push(videos.slice(index, index + columns));
     return rows;
   }, [videos, columns]);
-  const [hero, setHero] = useState<Video>();
+  const hero = useRef<Video>();
+  const preview = useRef<PreviewHandle>(null);
+  const setHero = useCallback((video: Video | undefined, immediate = false) => {
+    hero.current = video;
+    preview.current?.update(video, immediate);
+  }, []);
   const [history, setHistory] = useState<History[]>([]);
-  const [screen, setScreen] = useState<'home' | 'detail' | 'history'>('home');
+  const [screen, setScreen] = useState<'home' | 'detail' | 'history' | 'settings'>('home');
+  const [dialogMessage, setDialogMessage] = useState<DialogMessage | null>(null);
   const [detail, setDetail] = useState<Detail>();
   const [detailVideo, setDetailVideo] = useState<Video>();
   const [line, setLine] = useState(0);
+  const [episodesReversed, setEpisodesReversed] = useState(false);
+  const [episodeOrderTarget, setEpisodeOrderTarget] = useState<number>();
+  const bindEpisodeOrderTarget = useCallback((node: View | null) => setEpisodeOrderTarget(node ? findNodeHandle(node) || undefined : undefined), []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [detailError, setDetailError] = useState('');
@@ -117,6 +144,9 @@ export default function App() {
   const busy = useRef(false);
   const playing = useRef(false);
   const list = useRef<FlatList<Video[]>>(null);
+  const historyList = useRef<FlatList<History>>(null);
+  const episodeList = useRef<FlatList<number>>(null);
+  const focusedRow = useRef(-1);
   const lastPoster = useRef<View>(null);
   const entrance = useRef(new Animated.Value(1)).current;
   const entranceStyle = {opacity: entrance, transform: [{translateY: entrance.interpolate({inputRange: [0, 1], outputRange: [12, 0]})}]};
@@ -182,7 +212,7 @@ export default function App() {
       batch.forEach(video => {if (!seen.has(keyOf(video))) {merged.push(video); seen.add(keyOf(video));}});
       return merged;
     });
-    if (reset) setHero(batch[0]);
+    if (reset) setHero(batch[0], true);
     setHasMore(active.some(item => {const page = pages.current.get(item.url); return !page || page.next <= page.total;}));
     if (failures.length === requests.length) setError(failures.join('\n'));
     else if (failures.length) setNotice(`${failures.length} 个来源请求失败，可用“加载更多 / 重试”重试。`);
@@ -191,7 +221,7 @@ export default function App() {
 
   useEffect(() => {
     const token = ++generation.current;
-    pages.current.clear(); busy.current = false; setVideos([]); setHero(undefined);
+    pages.current.clear(); busy.current = false; setVideos([]); setHero(undefined, true); focusedRow.current = -1;
     setHasMore(false);
     load(true, token);
     return () => {generation.current++; api.cancelRequests('page');};
@@ -216,6 +246,7 @@ export default function App() {
     } catch (err) {if (token === detailGeneration.current) setDetailError(message(err));}
   };
   const home = () => {detailGeneration.current++; api.cancelRequests('detail'); setScreen('home'); setDetail(undefined); setDetailVideo(undefined); setDetailError('');};
+  const openSettings = () => {detailGeneration.current++; api.cancelRequests('detail'); setScreen('settings');};
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (picker) {setPicker(null); return true;}
@@ -231,7 +262,7 @@ export default function App() {
     if (!detail || playing.current) return;
     playing.current = true;
     try {await api.play(detail.video, line, episode, resume);}
-    catch (err) {Alert.alert('播放失败', message(err));}
+    catch (err) {setDialogMessage({title: '播放失败', message: message(err)});}
     finally {playing.current = false;}
   };
   const search = (text = query) => {
@@ -240,6 +271,11 @@ export default function App() {
     home(); setReload(value => value + 1);
   };
   const currentLine = detail?.lines[line];
+  // 显示顺序与播放索引分离，倒序后仍播放原线路中的对应剧集。
+  const episodeIndices = useMemo(() => {
+    const indices = (currentLine?.episodes || []).map((_, index) => index);
+    return episodesReversed ? indices.reverse() : indices;
+  }, [currentLine, episodesReversed]);
   const resumeEpisode = currentLine && detail?.progress.line === currentLine.name ? Math.max(0, Math.min(detail.progress.episode || 0, currentLine.episodes.length - 1)) : 0;
   const pickerRows = picker === 'source' ? sources.filter(item => item.enabled).map(item => ({id: item.url, name: item.name}))
     : picker === 'category' ? [{id: '', name: '全部分类'}, ...categories]
@@ -247,7 +283,9 @@ export default function App() {
 
   return <CoverSourcesContext.Provider value={coverSources}><View style={s.app}>
     {exitVisible && <ExitDialog reduced={reduced} onDismiss={() => setExitVisible(false)} />}
-    <TVFocusGuideView autoFocus style={[s.header, height < 600 && {height: 58}]}>
+    {dialogMessage && <MessageDialog {...dialogMessage} reduced={reduced} onDismiss={() => setDialogMessage(null)} />}
+    {screen === 'settings' && <SettingsScreen sources={sources} reduced={reduced} onBack={home} onChanged={refreshLocal} />}
+    {screen !== 'settings' && <TVFocusGuideView autoFocus style={[s.header, height < 600 && {height: 58}]}>
       <View style={s.brand}><Text style={s.brandIcon}>▶</Text><Text style={s.brandName}>Libre<Text style={s.accent}>TV</Text></Text><Text style={s.brandLabel}>家庭影院</Text></View>
       <View style={s.nav}>
         <FocusButton label="发现" onPress={() => {
@@ -255,9 +293,9 @@ export default function App() {
           home(); setReload(value => value + 1);
         }} />
         <FocusButton label="继续观看" onPress={() => {detailGeneration.current++; api.cancelRequests('detail'); setScreen('history'); refreshLocal();}} />
-        <FocusButton label="影视源管理" onPress={api.openSettings} />
+        <FocusButton label="影视源管理" onPress={openSettings} />
       </View>
-    </TVFocusGuideView>
+    </TVFocusGuideView>}
     {screen === 'home' && <Animated.View style={[s.content, entranceStyle]}>
       <View style={s.filters}>
         {/* 原生 ReactEditText 不接受方向键请求焦点，通过可聚焦外框承接电视导航。 */}
@@ -272,55 +310,81 @@ export default function App() {
         <FocusButton label={source?.name || '选择来源'} onPress={() => setPicker('source')} />
         <FocusButton label={category.name} onPress={() => setPicker('category')} disabled={!!keyword} />
       </View>
-      <Hero video={hero} />
+      <HeroPreview ref={preview} initial={hero.current} />
       <View style={s.sectionHead}><Text style={s.sectionTitle}>{keyword ? `搜索 · ${keyword}` : '发现好故事'}</Text><Text style={s.sectionHint}>{loading ? '正在连接片源…' : `${videos.length} 部影片  /  方向键浏览 · 确定查看`}</Text></View>
       {!!notice && <Text style={s.notice}>{notice}</Text>}
+      <FocusGrid columns={columns} itemCount={videos.length} style={s.listArea}
+        onFocusRequest={({nativeEvent}) => list.current?.scrollToIndex({index: Math.floor(nativeEvent.index / columns), animated: false})}>
       <TVFocusGuideView autoFocus style={s.listArea}>
         <FlatList ref={list} key={columns} data={videoRows} keyExtractor={row => keyOf(row[0])}
           removeClippedSubviews={false} contentContainerStyle={s.grid} initialNumToRender={2}
-          renderItem={({item: row, index: rowIndex}) => <View style={{flexDirection: 'row'}}>
+          getItemLayout={(_, index) => ({length: rowHeight, offset: rowHeight * index, index})}
+          renderItem={({item: row, index: rowIndex}) => <View style={{flexDirection: 'row', height: rowHeight}}>
             {row.map((item, columnIndex) => <Poster key={keyOf(item)} video={item} width={posterWidth} reduced={reduced}
               preferred={rowIndex === 0 && columnIndex === 0}
+              index={rowIndex * columns + columnIndex}
               posterRef={rowIndex * columns + columnIndex === videos.length - 1 ? lastPoster : undefined}
               nextFocusUp={rowIndex === 0 ? inputTarget : undefined}
-              onFocus={() => {setHero(item); list.current?.scrollToOffset({offset: rowIndex * (posterWidth * 1.38 + 63), animated: !reduced});}}
+              onFocus={() => {
+                setHero(item);
+                if (focusedRow.current !== rowIndex) {
+                  focusedRow.current = rowIndex;
+                  list.current?.scrollToOffset({offset: rowIndex * rowHeight, animated: false});
+                }
+              }}
               onPress={() => openDetail(item)} />)}
           </View>}
           ListEmptyComponent={<View style={s.empty}>
             {loading ? <View style={s.skeletonRow}>{Array.from({length: columns}, (_, i) => <View key={i} style={[s.skeleton, {width: posterWidth, height: posterWidth * 1.15}]} />)}</View>
               : <><Text style={s.emptyTitle}>{error ? '暂时连接不上片源' : source ? '暂时没有影片' : '添加一个影视源，开始观看'}</Text>
                 <Text style={s.emptyText}>{error || '可以换个来源、调整分类或搜索影片。'}</Text>
-                <FocusButton label={source ? '重新加载' : '管理影视源'} preferred onPress={source ? () => setReload(value => value + 1) : api.openSettings} /></>}
+                <FocusButton label={source ? '重新加载' : '管理影视源'} preferred onPress={source ? () => setReload(value => value + 1) : openSettings} /></>}
           </View>}
           ListFooterComponent={videos.length > 0 || hasMore ? <View style={s.footer}>
             {videos.length > 0 && !!error && <Text style={s.emptyText}>{error}</Text>}
-            {hasMore ? <FocusButton label={loading ? '正在加载…' : '加载更多 / 重试'} disabled={loading} onPress={() => {
+            {hasMore ? <FocusButton nativeID="grid-footer" label={loading ? '正在加载…' : '加载更多 / 重试'} disabled={loading} onPress={() => {
               // 先回到已有列表末项；追加数据沿用影片 key，保留该海报的焦点。
               lastPoster.current?.requestTVFocus();
               load(false, generation.current);
             }} /> : <Text style={s.sectionHint}>已浏览全部影片</Text>}
           </View> : null} />
       </TVFocusGuideView>
+      </FocusGrid>
     </Animated.View>}
     {screen === 'history' && <Animated.View style={[s.historyContent, entranceStyle]}>
       <View style={s.sectionHead}><View><Text style={s.eyebrow}>PICK UP WHERE YOU LEFT OFF</Text><Text style={s.historyTitle}>继续你的故事</Text></View>
-        <FocusButton label="清空记录" onPress={() => Alert.alert('清空观看记录？', '清空后无法恢复。', [{text: '取消', style: 'cancel'}, {text: '清空', onPress: () => api.clearHistory().then(refreshLocal).catch(err => Alert.alert('清空失败', message(err)))}])} /></View>
-      <TVFocusGuideView autoFocus style={s.listArea}><FlatList key={columns} data={history} numColumns={columns} keyExtractor={item => item.key} removeClippedSubviews={false}
-        renderItem={({item, index}) => <Poster video={item.video} width={posterWidth} progress={item} reduced={reduced} preferred={index === 0} onFocus={() => {}} onPress={() => openDetail(item.video)} />}
+        <FocusButton label="清空记录" onPress={() => setDialogMessage({title: '清空观看记录？', message: '清空后无法恢复。', confirm: '清空',
+          onConfirm: () => {api.clearHistory().then(refreshLocal).catch(err => setDialogMessage({title: '清空失败', message: message(err)}));}})} /></View>
+      <FocusGrid columns={columns} itemCount={history.length} style={s.listArea}
+        onFocusRequest={({nativeEvent}) => historyList.current?.scrollToIndex({index: Math.floor(nativeEvent.index / columns), animated: false})}>
+      <TVFocusGuideView autoFocus style={s.listArea}><FlatList ref={historyList} key={columns} data={history} numColumns={columns} keyExtractor={item => item.key} removeClippedSubviews={false}
+        getItemLayout={(_, index) => ({length: rowHeight, offset: rowHeight * index, index})}
+        renderItem={({item, index}) => <Poster index={index} video={item.video} width={posterWidth} progress={item} reduced={reduced} preferred={index === 0} onFocus={() => {}} onPress={() => openDetail(item.video)} />}
         ListEmptyComponent={<View style={s.empty}><Text style={s.emptyTitle}>还没有观看记录</Text><Text style={s.emptyText}>播放影片后，会在这里记住你的进度。</Text><FocusButton label="去发现影片" preferred onPress={home} /></View>} /></TVFocusGuideView>
+      </FocusGrid>
     </Animated.View>}
     {screen === 'detail' && <Animated.View style={[s.content, entranceStyle]}>
       <Hero video={detail?.video || detailVideo} detail>
         <TVFocusGuideView autoFocus style={s.detailActions}>
-          {currentLine && <FocusButton label={detail?.progress.line === currentLine.name ? `继续观看 · ${currentLine.episodes[resumeEpisode]}` : '▶ 立即播放'} primary preferred onPress={() => play(resumeEpisode, true)} />}
+          {currentLine && <FocusButton label={detail?.progress.line === currentLine.name ? `继续观看 · ${currentLine.episodes[resumeEpisode]}` : '▶ 立即播放'} preferred onPress={() => play(resumeEpisode, true)} />}
           <FocusButton label="返回列表" preferred={!currentLine} onPress={home} />
           {detailVideo && <FocusButton label="搜索其他来源" onPress={() => search(titleOf(detailVideo))} />}
         </TVFocusGuideView>
       </Hero>
       {detail ? currentLine ? <>
-        <View style={s.sectionHead}><Text style={s.sectionTitle}>选集 · {currentLine.episodes.length} 集</Text><FocusButton label={`线路 · ${currentLine.name}`} onPress={() => setPicker('line')} /></View>
-        <TVFocusGuideView autoFocus style={s.listArea}><FlatList key={line} data={currentLine.episodes} numColumns={6} keyExtractor={(_, i) => String(i)} contentContainerStyle={s.episodeGrid}
-          renderItem={({item, index}) => <View style={{width: (width - 88) / 6, padding: 4}}><FocusButton label={item} onPress={() => play(index, false)} /></View>} /></TVFocusGuideView>
+        <View style={s.sectionHead}>
+          <Text style={s.sectionTitle}>选集 · {currentLine.episodes.length} 集</Text>
+          <View style={s.episodeActions}>
+            <FocusButton buttonRef={bindEpisodeOrderTarget} label={episodesReversed ? '倒序' : '正序'} onPress={() => setEpisodesReversed(value => !value)} />
+            <FocusButton label={`线路 · ${currentLine.name}`} onPress={() => setPicker('line')} />
+          </View>
+        </View>
+        <FocusGrid columns={6} itemCount={currentLine.episodes.length} style={s.listArea}
+          onFocusRequest={({nativeEvent}) => episodeList.current?.scrollToIndex({index: Math.floor(nativeEvent.index / 6), animated: false})}>
+        <TVFocusGuideView autoFocus style={s.listArea}><FlatList ref={episodeList} key={`${line}-${episodesReversed}`} data={episodeIndices} numColumns={6} keyExtractor={item => String(item)} contentContainerStyle={s.episodeGrid}
+          getItemLayout={(_, index) => ({length: 54, offset: 54 * index, index})}
+          renderItem={({item, index}) => <View style={{width: (width - 88) / 6, padding: 4, height: 54}}><FocusButton nativeID={`grid-item-${index}`} nextFocusUp={index < 6 ? episodeOrderTarget : undefined} label={currentLine.episodes[item]} onPress={() => play(item, false)} /></View>} /></TVFocusGuideView>
+        </FocusGrid>
       </> : <View style={s.empty}><Text style={s.emptyTitle}>暂无可直接播放的线路</Text><Text style={s.emptyText}>可通过“搜索其他来源”寻找可播放的片源。</Text></View>
         : <View style={s.empty}><Text style={s.emptyTitle}>{detailError ? '详情加载失败' : '正在准备影片…'}</Text><Text style={s.emptyText}>{detailError}</Text>
           {!!detailError && detailVideo && <FocusButton label="重试" onPress={() => openDetail(detailVideo)} />}</View>}
@@ -360,11 +424,12 @@ const s = StyleSheet.create({
   posterFocus: {borderColor: C.accent, elevation: 10}, posterFallback: {flex: 1, justifyContent: 'center', alignItems: 'center', padding: 12},
   fallbackLetter: {color: '#415572', fontSize: 38}, fallbackTitle: {color: C.muted, fontSize: 14, textAlign: 'center', marginTop: 12},
   posterBadge: {position: 'absolute', bottom: 0, left: 0, right: 0, padding: 8, backgroundColor: '#08101DE8'}, badgeText: {color: C.text, fontSize: 10},
-  posterTitle: {color: C.text, fontSize: 14, fontWeight: '700', marginTop: 10}, posterMeta: {color: C.muted, fontSize: 10, marginTop: 4},
+  posterTitle: {color: C.text, fontSize: 14, lineHeight: 18, fontWeight: '700', marginTop: 10}, posterMeta: {color: C.muted, fontSize: 10, lineHeight: 14, marginTop: 4},
   progressTrack: {height: 3, backgroundColor: '#33435B', position: 'absolute', bottom: 0, left: 0, right: 0}, progressFill: {height: 3, backgroundColor: C.accent},
   empty: {padding: 24, alignItems: 'center', gap: 10}, emptyTitle: {color: C.text, fontSize: 20, fontWeight: '700'},
   emptyText: {color: C.muted, fontSize: 13, lineHeight: 20, textAlign: 'center'}, footer: {alignItems: 'center', padding: 20, gap: 8},
   skeletonRow: {flexDirection: 'row', gap: 18}, skeleton: {backgroundColor: '#192738', borderRadius: 12},
   historyContent: {flex: 1, paddingHorizontal: 36, paddingTop: 22}, historyTitle: {fontSize: 30, fontWeight: '800', color: C.text, marginTop: 10},
   episodeGrid: {paddingBottom: 20},
+  episodeActions: {flexDirection: 'row', gap: 8},
 });

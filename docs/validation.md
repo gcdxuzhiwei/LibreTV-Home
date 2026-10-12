@@ -2,6 +2,35 @@
 
 以下 `dist` 路径表示验证时的本地产物，已由 `.gitignore` 排除。公开下载使用 GitHub Release 附件，发布步骤见 [发布说明](releasing.md)。历史校验文件可能同时包含 APK 和源码归档；当前构建脚本生成的校验文件仅包含 APK。
 
+## 1.2.4：来源复选框组件
+
+2026-10-12：来源启用控件改用独立 `FocusCheckbox`，保留透明行背景与来源文字。参考 [Motion Base UI Checkbox](https://motion.dev/examples/react-base-checkbox) 的勾线路径动画，使用 React Native Animated 实现两段线依次绘制与收回、按压和焦点缩放；减少动画模式直接切换状态。
+
+- `scripts/build.ps1` 类型检查、Android 构建、Lint 与固定签名校验通过，`git diff --check` 通过。重新生成同版本 APK 和 SHA256，当前 APK SHA256 为 `a6c025faeab3cd641259b6b3386f28b378baebfd3d717212ca8732abd40ca6ed`。
+- API 30 模拟器覆盖安装后，`uiautomator dump` 中来源控件为 `android.widget.CheckBox`，`checked` 与启用状态一致。方向键进入暴风来源，确认取消选中后焦点保持在该控件；重启后取消状态保留，再通过遥控确认恢复原配置。量子启用、非凡停用状态未变。
+- 选中、未选中与焦点样式截图保存在忽略的 `.tools/rn-preview/checkbox-settings.png`、`.tools/rn-preview/checkbox-focused.png`。未验证实体电视，未提交或发布。
+
+## 1.2.4：补齐共享弹窗和按钮
+
+2026-10-12：影视源管理迁入 `SettingsScreen`，移除原生 `SettingsActivity`，清空记录与来源管理弹窗统一使用共享组件。本次未递增版本号。
+
+- `scripts/build.ps1` 类型检查、`assembleDebug lintDebug`、固定签名校验及 `git diff --check` 通过。生成 `dist/LibreTV-Home-1.2.4.apk` 和 `dist/SHA256-1.2.4.txt`；本次 APK SHA256 为 `2ee96f4377597e85bed39f9bdc36efe2a3e264552a5226f5ca077119d12750a2`，替换此前同版本的本地产物。
+- API 30 模拟器覆盖安装成功。遥控方向键和确认键验证添加来源：默认聚焦来源名称，输入名称与 URL 后能进入取消、保存按钮；保存临时来源成功。关于弹窗显示 1.2.4，内容完整且只有一个默认焦点。
+- 来源检测成功显示“暴风资源 可用，返回 20 部影视”；临时本机地址连接失败也使用共享结果弹窗，默认聚焦确定。删除临时来源默认聚焦取消，取消保留来源，右移到删除后确认可移除来源；临时来源已清理。
+- 清空记录默认聚焦取消，遥控确认取消后仍显示原有 8 条观看记录。未实际清空已有记录，未复测实体电视和播放器。
+- 添加、关于、清空布局截图保存在忽略的 `.tools/rn-preview/dialog-*.png`。未提交、推送或发布。
+
+## 1.2.4：网格方向键与海报防抖
+
+2026-10-12：版本更新为 1.2.4 / versionCode 18，同步 Android、npm 项目和锁文件、README、更新日志与改造记录。“关于”使用 `BuildConfig.VERSION_NAME` 自动显示新版本。
+
+- `scripts/build.ps1` 的类型检查、`assembleDebug lintDebug` 与固定签名校验通过，Lint 0 errors / 11 warnings；APK 元数据为 `org.libretv.home`、1.2.4 / versionCode 18，`git diff --check` 通过。沙箱内首次构建无法连接本机 Gradle daemon，恢复本机通信权限后构建成功。
+- 生成 `dist/LibreTV-Home-1.2.4.apk`（54,041,311 字节）及 `dist/SHA256-1.2.4.txt`；APK SHA256 为 `5501941e6fe96dd59d29dec4f446a23a7b20a874bf97fdab4d1eadfc8e01ee16`。
+- Android TV 模拟器覆盖安装成功，`dumpsys package` 确认 1.2.4 / versionCode 18。使用临时本地 CMS 的 20 部影片、7 列布局逐步发送方向键，并用 `uiautomator dump` 断言：首项左移不变、第 7→8 项右移跨行、第 8→7 项左移跨行、第 7→14 项下移、第 14→20 项进入不满末行、末项右移不变、第 20→13→6 项上移，首行上移进入搜索框。
+- 末行下移能进入加载更多，追加至 40 项后保持第 20 项焦点，右移进入第 21 项。17 集、6 列选集验证首项左移、6→7→6 跨行、末行下移及末项右移保持、17→11 上移；已有 8 条观看记录也验证两端、7→8→7 跨行及不满末行上下移动。
+- 首页连续发送 15 次右键后最终焦点为第 16 项，上方预览标题也为第 16 项。海报更新采用独立组件内的 150ms 防抖，不触发首页与列表的整页重渲染；同一行不重复触发滚动。近期日志未发现 AndroidRuntime / ReactNativeJS 运行错误。层级记录保存在忽略的 `.tools/focus-v124-*.xml`，验证后恢复模拟器原始来源与观看记录配置。
+- 未测试实体电视的实际帧率、网络图片加载速度或本版视频播放；未提交、推送或发布。
+
 ## 1.2.3：弹窗动画与版本更新
 
 2026-10-12：将已合并到最新网络兼容与封面补全代码的弹窗动画纳入 1.2.3 / versionCode 17。同步 Android 与 npm 项目版本、README、更新日志及改造记录；“关于”标题通过 `BuildConfig.VERSION_NAME` 自动显示新版本。
